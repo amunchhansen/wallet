@@ -21,6 +21,12 @@ import {
     type Wallet,
 } from '@canton-network/core-wallet-store'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+    preparedTransaction,
+    preparedTransactionHash,
+    secondPreparedTransaction,
+    secondPreparedTransactionHash,
+} from './__tests__/prepared-transactions'
 import { fakeBrowser } from 'wxt/testing/fake-browser'
 import { AuthService } from '../auth-service'
 import { initializeWalletStore } from '../store'
@@ -88,8 +94,6 @@ describe('userController.addSession', () => {
 describe('userController transactions', () => {
     const otherAuthContext = { ...authContext, accessToken: 'token-2' }
     const keyPair = createKeyPair()
-    // Base64 of a 32-byte hash, as signed by the wallet-kernel driver
-    const preparedTransactionHash = btoa('h'.repeat(32))
     const ledgerResult = { updateId: 'update-1', completionOffset: 42 }
 
     const wallet: Wallet = {
@@ -108,7 +112,7 @@ describe('userController transactions', () => {
         id: 'tx-1',
         commandId: 'cmd-1',
         status: 'pending',
-        preparedTransaction: 'prepared-tx',
+        preparedTransaction,
         preparedTransactionHash,
         origin: 'https://dapp.example',
         createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -290,8 +294,8 @@ describe('userController transactions', () => {
             ...pendingTransaction,
             id: 'tx-2',
             commandId: 'cmd-2',
-            preparedTransaction: 'prepared-tx-2',
-            preparedTransactionHash: btoa('i'.repeat(32)),
+            preparedTransaction: secondPreparedTransaction,
+            preparedTransactionHash: secondPreparedTransactionHash,
         }
         await store.setTransaction({ ...secondTransaction })
         const secondParams = { ...params, transactionId: secondTransaction.id }

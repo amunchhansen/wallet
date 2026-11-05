@@ -17,6 +17,11 @@ import {
 import type { Notifier } from './notification/index.js'
 import { TransactionService } from './transaction-service.js'
 import { initializeLogRecorder } from './__tests__/test-utils.js'
+import {
+    otherPreparedTransactionV3,
+    preparedTransactionHashV3,
+    preparedTransactionV3,
+} from './__tests__/prepared-transaction.js'
 
 const authContext: AuthContext = {
     userId: 'user-1',
@@ -45,8 +50,8 @@ const pendingTransaction: Transaction = {
     id: 'tx-1',
     commandId: 'cmd-1',
     status: 'pending',
-    preparedTransaction: 'prepared-tx',
-    preparedTransactionHash: 'tx-hash',
+    preparedTransaction: preparedTransactionV3,
+    preparedTransactionHash: preparedTransactionHashV3,
     origin: 'https://dapp.example',
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
 }
@@ -264,6 +269,74 @@ describe('TransactionService', () => {
                         },
                     })
                 )
+            })
+        })
+
+        describe('hash binding', () => {
+            it.each([
+                [
+                    'hash',
+                    {
+                        ...pendingTransaction,
+                        preparedTransactionHash: btoa('x'.repeat(32)),
+                    },
+                ],
+                [
+                    'transaction',
+                    {
+                        ...pendingTransaction,
+                        preparedTransaction: otherPreparedTransactionV3,
+                    },
+                ],
+            ])(
+                'refuses to sign when the %s was tampered with',
+                async (_, transaction) => {
+                    const signTransaction = vi.fn()
+                    const service = createService(
+                        createStore(transaction),
+                        {
+                            [SigningProvider.WALLET_KERNEL]: createDriver({
+                                signTransaction,
+                            }),
+                        },
+                        notifier
+                    )
+
+                    await expect(
+                        service.sign(authContext, wallet, signParams)
+                    ).rejects.toThrow('does not match its content')
+                    expect(signTransaction).not.toHaveBeenCalled()
+                }
+            )
+
+            it('refuses to re-sign at execution when the hash does not match', async () => {
+                const signTransaction = vi.fn()
+                const transaction = {
+                    ...signedTransaction,
+                    preparedTransactionHash: btoa('x'.repeat(32)),
+                }
+                const service = createService(
+                    createStore(transaction),
+                    {
+                        [SigningProvider.WALLET_KERNEL]: createDriver({
+                            signTransaction,
+                        }),
+                    },
+                    notifier
+                )
+
+                await expect(
+                    service.execute(
+                        authContext.userId,
+                        wallet,
+                        transaction,
+                        executeParams,
+                        ledgerClient,
+                        authContext,
+                        network
+                    )
+                ).rejects.toThrow('does not match its content')
+                expect(signTransaction).not.toHaveBeenCalled()
             })
         })
 
@@ -496,7 +569,7 @@ describe('TransactionService', () => {
 
                 expect(signTransaction).toHaveBeenCalledWith(
                     expect.objectContaining({
-                        txHash: 'tx-hash',
+                        txHash: pendingTransaction.preparedTransactionHash,
                     })
                 )
                 expect(result).toMatchObject({

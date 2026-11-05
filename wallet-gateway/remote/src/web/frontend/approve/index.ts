@@ -12,6 +12,12 @@ import {
     type ParsedTransactionInfo,
     parsePreparedTransaction,
 } from '@canton-network/core-tx-visualizer'
+import {
+    clearSign,
+    type ClearSigningResult,
+    requiredTemplates,
+} from '@canton-network/core-tx-clear-signing'
+import { resolveDescriptors } from '../clear-signing/registry.js'
 import { createUserClient } from '../rpc-client'
 import { setLocationHref } from '../navigation.js'
 import { stateManager } from '../state-manager'
@@ -38,6 +44,7 @@ export class ApproveUi extends BaseElement {
     @state() accessor txHash = ''
     @state() accessor tx = ''
     @state() accessor txParsed: ParsedTransactionInfo | null = null
+    @state() accessor clearSigning: ClearSigningResult | null = null
     @state() accessor status = ''
     @state() accessor createdAt: string | null = null
     @state() accessor signedAt: string | null = null
@@ -113,6 +120,14 @@ export class ApproveUi extends BaseElement {
         } catch (error) {
             console.error('Error parsing prepared transaction:', error)
             this.txParsed = null
+        }
+
+        try {
+            const descriptors = resolveDescriptors(requiredTemplates(this.tx))
+            this.clearSigning = clearSign(this.tx, descriptors)
+        } catch (error) {
+            console.error('Error describing prepared transaction:', error)
+            this.clearSigning = null
         }
 
         const wallets = await userClient.request({
@@ -346,6 +361,7 @@ export class ApproveUi extends BaseElement {
                 .txHash=${this.txHash}
                 .tx=${this.tx}
                 .parsed=${this.txParsed}
+                .clearSigning=${this.clearSigning}
                 .createdAt=${this.createdAt}
                 .signedAt=${this.signedAt}
                 .origin=${this.origin}

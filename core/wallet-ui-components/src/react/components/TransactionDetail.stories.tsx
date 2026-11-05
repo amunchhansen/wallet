@@ -3,6 +3,7 @@
 
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import type { ParsedTransactionInfo } from '@canton-network/core-tx-visualizer'
+import type { ClearSigningResult } from '@canton-network/core-tx-clear-signing'
 import {
     findAllByShadowRole,
     findAllByShadowText,
@@ -325,5 +326,141 @@ export const MissingData: Story = {
                 await findAllByShadowText(canvasElement, 'N/A')
             ).toHaveLength(6)
         )
+    },
+}
+
+const pingTemplate = {
+    packageId:
+        'de2cc2f90eb523414ff54e899951dadd8789a4c07e0f71f6d6c9eaf57d412a54',
+    moduleName: 'Canton.Internal.Ping',
+    entityName: 'Ping',
+}
+
+const factoryTemplate = {
+    packageId:
+        'fb10433a48c24f30076a7aee03a3e314b7ab02fe9a22e2069e3af92d2b6ac88a',
+    moduleName: 'Splice.ExternalPartyAmuletRules',
+    entityName: 'ExternalPartyAmuletRules',
+}
+
+const clearSigning: ClearSigningResult = {
+    complete: false,
+    operations: [
+        {
+            nodeId: '0',
+            kind: 'create',
+            template: pingTemplate,
+            descriptor: {
+                name: 'Canton ping',
+                publisher: 'Digital Asset',
+                version: '1.0.0',
+            },
+            status: 'described',
+            intent: 'Ping ping-1 from alice::1220aa to bob::1220bb',
+            fields: [
+                { label: 'Ping ID', path: 'id', value: 'ping-1' },
+                {
+                    label: 'Executors',
+                    path: 'executors.[]',
+                    value: ['alice::1220aa', 'bob::1220bb'],
+                },
+                {
+                    label: 'Deadline',
+                    path: 'deadline',
+                    error: 'optional value is None',
+                },
+            ],
+        },
+        {
+            nodeId: '1',
+            kind: 'exercise',
+            template: pingTemplate,
+            choice: 'Archive',
+            choiceId: 'Archive',
+            status: 'undescribed',
+            intent: 'Exercise Archive on Canton.Internal.Ping:Ping',
+            fields: [],
+        },
+        {
+            nodeId: '2',
+            kind: 'exercise',
+            template: factoryTemplate,
+            choice: 'Splice.Api.Token.AllocationInstructionV2:AllocationFactory:AllocationFactory_Allocate',
+            choiceId: 'AllocationFactory_Allocate',
+            interface: {
+                ...factoryTemplate,
+                moduleName: 'Splice.Api.Token.AllocationInstructionV2',
+                entityName: 'AllocationFactory',
+            },
+            descriptor: {
+                name: 'Amulet rules for external parties',
+                publisher: 'Splice',
+                version: '1.0.0',
+            },
+            status: 'described',
+            intent: 'Allocate funds for a settlement',
+            fields: [],
+        },
+    ],
+}
+
+export const ClearSigned: Story = {
+    args: { clearSigning },
+    play: async ({ canvasElement }) => {
+        for (const text of [
+            'What you are signing',
+            'Ping ping-1 from alice::1220aa to bob::1220bb',
+            'alice::1220aa, bob::1220bb',
+            'Cannot display: optional value is None',
+            // The undescribed operation's intent is followed by its badge
+            /^Exercise Archive on Canton\.Internal\.Ping:Ping/,
+            'Not described',
+        ]) {
+            await expect(
+                await findByShadowText(canvasElement, text)
+            ).toBeInTheDocument()
+        }
+        await expect(
+            await findByShadowRole(canvasElement, 'alert')
+        ).toHaveTextContent('Parts of this transaction are not described.')
+    },
+}
+
+export const ClearSignedOperationKinds: Story = {
+    args: { clearSigning },
+    play: async ({ canvasElement }) => {
+        await expect(
+            await findAllByShadowText(canvasElement, 'Create')
+        ).toHaveLength(1)
+        await expect(
+            await findAllByShadowText(canvasElement, 'Exercise')
+        ).toHaveLength(2)
+        for (const text of [
+            // A plain choice and an interface choice
+            'Archive',
+            'AllocationFactory_Allocate via Splice.Api.Token.AllocationInstructionV2:AllocationFactory',
+            'Splice.ExternalPartyAmuletRules:ExternalPartyAmuletRules',
+            // The descriptor's own claim about itself
+            /^Canton ping v1\.0\.0 by\s+Digital Asset$/,
+        ]) {
+            await expect(
+                await findByShadowText(canvasElement, text)
+            ).toBeInTheDocument()
+        }
+        // The undescribed exercise has no descriptor, so it has no "Described by" row
+        await expect(
+            await findAllByShadowText(canvasElement, 'Described by')
+        ).toHaveLength(2)
+    },
+}
+
+export const WithoutClearSigning: Story = {
+    play: async ({ canvasElement }) => {
+        await findByShadowRole(canvasElement, 'heading', {
+            name: 'Activity Details',
+        })
+        await expect(
+            queryByShadowText(canvasElement, 'What you are signing')
+        ).not.toBeInTheDocument()
     },
 }

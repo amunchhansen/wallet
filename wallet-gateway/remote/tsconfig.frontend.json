@@ -2,8 +2,12 @@
     "extends": "../../tsconfig.web.json",
     "compilerOptions": {
         "types": [],
+        "resolveJsonModule": true,
         "useDefineForClassFields": false,
         "composite": true
     },
-    "include": ["src/web/frontend"]
+    "include": [
+        "src/web/frontend",
+        "src/web/frontend/clear-signing/descriptors/*.json"
+    ]
 }

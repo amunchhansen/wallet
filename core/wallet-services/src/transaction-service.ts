@@ -42,9 +42,18 @@ import {
     type AuthContext,
     AuthTokenProvider,
 } from '@canton-network/core-wallet-auth'
+import { computePreparedTransactionHash } from '@canton-network/core-tx-hashing'
 import { getLogger } from '@logtape/logtape'
 
 export type SignAndExecuteResult = SignResult | ExecuteResult
+
+function base64Bytes(base64: string): Uint8Array {
+    return Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
+}
+
+function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
+    return a.length === b.length && a.every((byte, i) => byte === b[i])
+}
 
 const SUBMIT_OUTCOME_UNKNOWN_ERROR_CODES = [
     ...defaultRetryableOptions.cantonErrorKeys,
@@ -90,6 +99,7 @@ export class TransactionService {
         const tx = await this.loadPreparedTransactionForSigning(
             signParams.transactionId
         )
+        await this.assertHashBinding(tx)
 
         const baseSignParams = {
             tx: tx.preparedTransaction,
@@ -467,6 +477,23 @@ export class TransactionService {
         return existingTx
     }
 
+    /**
+     * The participant returns the hash with the prepared transaction only for convenience. Signing it
+     * unchecked would sign whatever the participant chose, not the transaction the user approved, so
+     * the hash is recomputed from the transaction bytes first.
+     */
+    private async assertHashBinding(tx: Transaction): Promise<void> {
+        const computed = await computePreparedTransactionHash(
+            tx.preparedTransaction,
+            this.hashingSchemeVersion
+        )
+        if (!bytesEqual(computed, base64Bytes(tx.preparedTransactionHash))) {
+            throw new Error(
+                `Prepared transaction hash of transaction '${tx.id}' does not match its content; refusing to sign`
+            )
+        }
+    }
+
     private async signWithDriver(
         driver: SigningController,
         driverId: SigningProvider,
@@ -616,6 +643,8 @@ export class TransactionService {
             if (!driver) {
                 throw new Error(`Wallet kernel signing driver not available`)
             }
+
+            await this.assertHashBinding(transaction)
 
             const { signature } = await driver
                 .signTransaction({

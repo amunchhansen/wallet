@@ -1,0 +1,20 @@
+{
+    "$schema": "../../canton-clear-signing-v1.schema.json",
+    "context": {
+        "template": {
+            "moduleName": "Canton.Internal.Ping",
+            "entityName": "Ping"
+        }
+    },
+    "metadata": {
+        "version": "1.0.0",
+        "publisher": "<publisher>",
+        "name": "Invalid example"
+    },
+    "display": {
+        "creates": {
+            "intent": "Ping",
+            "fields": [{ "path": "id", "format": "string" }]
+        }
+    }
+}

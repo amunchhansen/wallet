@@ -15,6 +15,7 @@ import {
     makeWallet,
     mockRequest,
 } from '../__tests__/test-helpers.js'
+import { pingCreate } from '../__tests__/ping-transaction.js'
 
 const {
     mockCreateUserClient,
@@ -49,7 +50,10 @@ vi.mock('../state-manager.js', () => ({
     },
 }))
 vi.mock('../utils.js', () => ({ showToast }))
-vi.mock('@canton-network/core-tx-visualizer', () => ({
+vi.mock('@canton-network/core-tx-visualizer', async (importOriginal) => ({
+    ...(await importOriginal<
+        typeof import('@canton-network/core-tx-visualizer')
+    >()),
     parsePreparedTransaction,
 }))
 vi.mock('@canton-network/core-wallet-ui-components', async (importOriginal) => {
@@ -206,6 +210,50 @@ describe('UserUiApprove', () => {
             expect(setLocationHref).toHaveBeenCalledWith(
                 expect.stringContaining('/activities')
             )
+        })
+    })
+
+    describe('clear signing', () => {
+        it('describes the transaction with the bundled descriptors', async () => {
+            mockApproveState(
+                makeTransaction({ preparedTransaction: pingCreate })
+            )
+            el = await fixture<ApproveUi>(componentFixture)
+            await waitUntil(
+                () => el.clearSigning !== null,
+                'transaction described'
+            )
+
+            expect(el.clearSigning?.complete).toBe(true)
+            expect(el.clearSigning?.operations[0]?.intent).toMatch(/^Ping /)
+            expect(el.clearSigning?.operations[0]).toMatchObject({
+                kind: 'create',
+                descriptor: { name: 'Canton ping' },
+            })
+            const detail = el.shadowRoot?.querySelector(
+                'wg-transaction-detail'
+            ) as (HTMLElement & { clearSigning: unknown }) | null
+            await el.updateComplete
+            expect(detail?.clearSigning).toBe(el.clearSigning)
+        })
+
+        it('shows no description when the transaction cannot be decoded', async () => {
+            const consoleError = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {})
+            mockApproveState()
+            el = await fixture<ApproveUi>(componentFixture)
+            await waitUntil(
+                () => el.commandId === 'cmd-1',
+                'transaction loaded'
+            )
+
+            expect(el.clearSigning).toBeNull()
+            expect(consoleError).toHaveBeenCalledWith(
+                'Error describing prepared transaction:',
+                expect.anything()
+            )
+            consoleError.mockRestore()
         })
     })
 
