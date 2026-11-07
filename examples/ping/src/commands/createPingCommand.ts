@@ -6,20 +6,22 @@
 const templateId =
     '#canton-builtin-admin-workflow-ping:Canton.Internal.Ping:Ping'
 
+function pingCreate(party: string, id: string) {
+    return {
+        CreateCommand: {
+            templateId: templateId,
+            createArguments: {
+                id,
+                initiator: party,
+                responder: party,
+            },
+        },
+    }
+}
+
 export const createPingCommand = (party: string) => {
     return {
-        commands: [
-            {
-                CreateCommand: {
-                    templateId: templateId,
-                    createArguments: {
-                        id: `my-test-${new Date().getTime()}`,
-                        initiator: party,
-                        responder: party,
-                    },
-                },
-            },
-        ],
+        commands: [pingCreate(party, `my-test-${new Date().getTime()}`)],
     }
 }
 

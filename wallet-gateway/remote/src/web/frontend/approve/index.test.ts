@@ -233,7 +233,7 @@ describe('UserUiApprove', () => {
                         'de2cc2f90eb523414ff54e899951dadd8789a4c07e0f71f6d6c9eaf57d412a54',
                 },
                 descriptor: {
-                    name: 'Canton ping (canton-builtin-admin-workflow-ping)',
+                    name: 'Canton ping',
                 },
             })
             const detail = el.shadowRoot?.querySelector(
