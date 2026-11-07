@@ -13,7 +13,7 @@
         "name": "Canton ping"
     },
     "display": {
-        "creates": {
+        "create": {
             "intent": "Ping",
             "interpolatedIntent": "Ping {id} from {initiator} to {responder}",
             "fields": [
@@ -44,5 +44,5 @@
             }
         }
     },
-    "signature": []
+    "signatures": []
 }

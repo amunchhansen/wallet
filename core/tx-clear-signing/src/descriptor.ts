@@ -92,15 +92,15 @@ export const DescriptorSchema = z.strictObject({
     }),
     display: z
         .strictObject({
-            creates: OperationSchema.optional(),
+            create: OperationSchema.optional(),
             exercises: z
                 .record(z.string().regex(exerciseKey), OperationSchema)
                 .optional(),
         })
-        .refine((d) => d.creates !== undefined || d.exercises !== undefined, {
-            message: 'display needs creates or exercises',
+        .refine((d) => d.create !== undefined || d.exercises !== undefined, {
+            message: 'display needs create or exercises',
         }),
-    signature: z.array(z.record(z.string(), z.unknown())).optional(),
+    signatures: z.array(z.unknown()).max(0).optional(),
 })
 
 export type Descriptor = z.infer<typeof DescriptorSchema>
@@ -118,7 +118,7 @@ export class DescriptorError extends Error {
 /**
  * Validates descriptor JSON against the v1 descriptor format, including the rules JSON Schema cannot
  * express: every placeholder equals the path of a declared field, contract fields are declared once in
- * `creates` and read as `{@.contract.<path>}` from an exercise, and every enum reference exists.
+ * `create` and read as `{@.contract.<path>}` from an exercise, and every enum reference exists.
  *
  * @throws DescriptorError listing every problem found
  */
@@ -141,10 +141,10 @@ export function parseDescriptor(json: unknown): Descriptor {
 
 function crossReferenceProblems(d: Descriptor): string[] {
     const problems: string[] = []
-    const creates = d.display.creates
-    const contractPaths = creates ? fieldPaths(creates) : undefined
-    if (creates) {
-        problems.push(...operationProblems(d, 'creates', creates, undefined))
+    const create = d.display.create
+    const contractPaths = create ? fieldPaths(create) : undefined
+    if (create) {
+        problems.push(...operationProblems(d, 'create', create, undefined))
     }
     const exercises = d.display.exercises ?? {}
     for (const key of Object.keys(exercises).sort()) {
@@ -163,7 +163,7 @@ function crossReferenceProblems(d: Descriptor): string[] {
     return problems
 }
 
-// contractPaths is undefined for creates, where @.contract does not exist, and the creates field
+// contractPaths is undefined for create, where @.contract does not exist, and the create field
 // paths for an exercise.
 function operationProblems(
     d: Descriptor,
@@ -175,7 +175,7 @@ function operationProblems(
     for (const f of op.fields ?? []) {
         if (f.path.startsWith(CONTRACT_PREFIX)) {
             problems.push(
-                `${where}: field '${f.path}' reads the contract; declare it in creates`
+                `${where}: field '${f.path}' reads the contract; declare it in create`
             )
         }
         const enumName = f.params?.$ref.slice('$.metadata.enums.'.length)
@@ -207,7 +207,7 @@ function operationProblems(
                 )
             } else if (!contractPaths.includes(contractPath)) {
                 problems.push(
-                    `${where}: placeholder '${p}' has no field '${contractPath}' in creates`
+                    `${where}: placeholder '${p}' has no field '${contractPath}' in create`
                 )
             }
         } else if (!ownPaths.includes(p)) {

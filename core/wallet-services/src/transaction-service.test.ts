@@ -184,7 +184,7 @@ const hashVectorPlain = parseDescriptor({
         },
     },
     metadata: { version: '1.0.0', publisher: 'test', name: 'Plain' },
-    display: { creates: { intent: 'Create a plain value' } },
+    display: { create: { intent: 'Create a plain value' } },
 })
 
 function createService(

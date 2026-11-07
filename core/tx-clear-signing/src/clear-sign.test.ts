@@ -192,7 +192,7 @@ describe('clearSign', () => {
     it('reports an exercise without an operation as undescribed', () => {
         const createsOnly = parseDescriptor({
             ...pingJson,
-            display: { creates: pingJson.display.creates },
+            display: { create: pingJson.display.create },
         })
         const [op] = clearSign(respondToPing(), [createsOnly]).operations
         expect(op).toMatchObject({
@@ -205,7 +205,7 @@ describe('clearSign', () => {
     it('keys an interface choice by the interface', () => {
         const plain = (exercises: unknown) =>
             vectorDescriptor('Plain', {
-                creates: {
+                create: {
                     intent: 'Plain',
                     fields: [{ path: 'owner', format: 'party' }],
                 },
@@ -239,7 +239,7 @@ describe('clearSign', () => {
 
     it('describes every root, finding a contract created in the same transaction', () => {
         const plain = vectorDescriptor('Plain', {
-            creates: {
+            create: {
                 intent: 'Create a plain contract',
                 interpolatedIntent: 'Create a plain contract for {owner}',
                 fields: [{ path: 'owner', format: 'party' }],
@@ -283,7 +283,7 @@ describe('clearSign', () => {
         const allKinds = vectorDescriptor(
             'AllKinds',
             {
-                creates: {
+                create: {
                     intent: 'All kinds',
                     fields: [
                         { path: 'values.boolValue', format: 'boolean' },
@@ -350,7 +350,7 @@ describe('clearSign', () => {
 
     it('reads maps by key and counts their elements', () => {
         const mapsDescriptor = vectorDescriptor('Maps', {
-            creates: {
+            create: {
                 intent: 'Maps',
                 interpolatedIntent:
                     'alpha is {textMap["alpha"]} of {textMap.length} entries; inner is {nestedMap["outer"]["inner"]}',
@@ -380,7 +380,7 @@ describe('clearSign', () => {
         const variants = vectorDescriptor(
             'Variants',
             {
-                creates: {
+                create: {
                     intent: 'Variants',
                     interpolatedIntent:
                         'Colors {colors.[]}, dogs {animals.[].Dog.name}',
@@ -414,7 +414,7 @@ describe('clearSign', () => {
 
     it('fails a field whose format does not match the value', () => {
         const wrongFormat = vectorDescriptor('Plain', {
-            creates: {
+            create: {
                 intent: 'Plain',
                 fields: [{ path: 'owner', format: 'string' }],
             },

@@ -13,7 +13,7 @@
         "name": "Utility registry transfer offer"
     },
     "display": {
-        "creates": {
+        "create": {
             "intent": "Transfer offer",
             "interpolatedIntent": "Offer of {transfer.amount} {transfer.instrumentId.id} from {transfer.sender} to {transfer.receiver}, to be accepted before {transfer.executeBefore}",
             "fields": [
@@ -62,5 +62,5 @@
             }
         }
     },
-    "signature": []
+    "signatures": []
 }

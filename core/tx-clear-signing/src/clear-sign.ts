@@ -126,7 +126,7 @@ function describeNode(
             template,
             ...bound,
         }
-        const op = descriptor?.display.creates
+        const op = descriptor?.display.create
         if (!descriptor || !op) {
             return {
                 ...base,
@@ -225,7 +225,7 @@ function interpolate(template: string, op: Operation, scope: Scope): string {
         .join('')
 }
 
-// A placeholder is formatted like the field with the same path. {@.contract.<path>} uses the creates
+// A placeholder is formatted like the field with the same path. {@.contract.<path>} uses the create
 // field with <path>, resolved against the exercised contract.
 function renderPlaceholder(
     path: string,
@@ -234,11 +234,11 @@ function renderPlaceholder(
 ): string | string[] {
     if (path.startsWith(CONTRACT_PREFIX)) {
         const contractPath = path.slice(CONTRACT_PREFIX.length)
-        const field = scope.descriptor.display.creates?.fields?.find(
+        const field = scope.descriptor.display.create?.fields?.find(
             (f) => f.path === contractPath
         )
         if (!field) {
-            throw new PathError(`no creates field '${contractPath}'`)
+            throw new PathError(`no create field '${contractPath}'`)
         }
         return renderField(field, path, scope)
     }

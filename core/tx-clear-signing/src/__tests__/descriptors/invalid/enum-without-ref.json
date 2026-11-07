@@ -13,7 +13,7 @@
         "name": "Invalid example"
     },
     "display": {
-        "creates": {
+        "create": {
             "intent": "Ping",
             "fields": [{ "path": "id", "format": "enum" }]
         }

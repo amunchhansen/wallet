@@ -55,13 +55,13 @@ describe('parseDescriptor', () => {
     it.each([
         [
             'an undeclared placeholder',
-            { creates: { intent: 'Ping', interpolatedIntent: 'Ping {id}' } },
+            { create: { intent: 'Ping', interpolatedIntent: 'Ping {id}' } },
             "placeholder 'id' has no field with that path",
         ],
         [
-            'a contract read in creates',
+            'a contract read in create',
             {
-                creates: {
+                create: {
                     intent: 'Ping',
                     interpolatedIntent: '{@.contract.id}',
                     fields: [{ path: 'id' }],
@@ -72,7 +72,7 @@ describe('parseDescriptor', () => {
         [
             'a contract field that creates does not declare',
             {
-                creates: { intent: 'Ping', fields: [{ path: 'id' }] },
+                create: { intent: 'Ping', fields: [{ path: 'id' }] },
                 exercises: {
                     Respond: {
                         intent: 'Respond',
@@ -80,7 +80,7 @@ describe('parseDescriptor', () => {
                     },
                 },
             },
-            "has no field 'owner' in creates",
+            "has no field 'owner' in create",
         ],
         [
             'a contract field declared in an exercise',
@@ -92,12 +92,12 @@ describe('parseDescriptor', () => {
                     },
                 },
             },
-            'declare it in creates',
+            'declare it in create',
         ],
         [
             'a missing enum',
             {
-                creates: {
+                create: {
                     intent: 'Ping',
                     fields: [
                         {
@@ -113,7 +113,7 @@ describe('parseDescriptor', () => {
         [
             'an unterminated placeholder',
             {
-                creates: {
+                create: {
                     intent: 'Ping',
                     interpolatedIntent: 'Ping {id',
                     fields: [{ path: 'id' }],
@@ -124,7 +124,7 @@ describe('parseDescriptor', () => {
         [
             'an unmatched closing brace',
             {
-                creates: {
+                create: {
                     intent: 'Ping',
                     interpolatedIntent: 'Ping id}',
                     fields: [{ path: 'id' }],
@@ -138,7 +138,7 @@ describe('parseDescriptor', () => {
 
     it('treats doubled braces as literal text', () => {
         const display = {
-            creates: {
+            create: {
                 intent: 'Ping',
                 interpolatedIntent: '{{id}} is {id}',
                 fields: [{ path: 'id' }],
@@ -147,9 +147,9 @@ describe('parseDescriptor', () => {
         expect(() => parseDescriptor({ ...ping, display })).not.toThrow()
     })
 
-    it('needs creates or exercises', () => {
+    it('needs create or exercises', () => {
         expect(() => parseDescriptor({ ...ping, display: {} })).toThrow(
-            'display needs creates or exercises'
+            'display needs create or exercises'
         )
     })
 })

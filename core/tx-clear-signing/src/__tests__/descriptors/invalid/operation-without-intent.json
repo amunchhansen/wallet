@@ -13,7 +13,7 @@
         "name": "Invalid example"
     },
     "display": {
-        "creates": {
+        "create": {
             "interpolatedIntent": "Ping {id}",
             "fields": [{ "path": "id", "format": "string" }]
         }

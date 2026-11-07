@@ -23,7 +23,7 @@
         }
     },
     "display": {
-        "creates": {
+        "create": {
             "intent": "Amulet rules for external parties",
             "interpolatedIntent": "Amulet rules for external parties, administered by {dso}",
             "fields": [
@@ -96,5 +96,5 @@
             }
         }
     },
-    "signature": []
+    "signatures": []
 }

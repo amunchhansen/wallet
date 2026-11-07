@@ -9,11 +9,11 @@
     },
     "metadata": {
         "version": "1.0.0",
-        "publisher": "Canton Wallet Gateway",
-        "name": "Canton ping (canton-builtin-admin-workflow-ping)"
+        "publisher": "Blockdaemon",
+        "name": "Canton ping"
     },
     "display": {
-        "creates": {
+        "create": {
             "intent": "Ping",
             "interpolatedIntent": "Ping {id} from {initiator} to {responder}",
             "fields": [
@@ -52,5 +52,5 @@
             }
         }
     },
-    "signature": []
+    "signatures": []
 }
