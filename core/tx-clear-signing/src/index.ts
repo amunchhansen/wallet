@@ -25,3 +25,4 @@ export {
     TransactionShapeError,
     type TemplateRef,
 } from './roots.js'
+export { shippedDescriptors } from './shipped.js'

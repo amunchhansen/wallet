@@ -228,13 +228,26 @@ describe('UserUiApprove', () => {
             expect(el.clearSigning?.operations[0]?.intent).toMatch(/^Ping /)
             expect(el.clearSigning?.operations[0]).toMatchObject({
                 kind: 'create',
-                descriptor: { name: 'Canton ping' },
+                template: {
+                    packageId:
+                        'de2cc2f90eb523414ff54e899951dadd8789a4c07e0f71f6d6c9eaf57d412a54',
+                },
+                descriptor: {
+                    name: 'Canton ping (canton-builtin-admin-workflow-ping)',
+                },
             })
             const detail = el.shadowRoot?.querySelector(
                 'wg-transaction-detail'
-            ) as (HTMLElement & { clearSigning: unknown }) | null
+            ) as (HTMLElement & { updateComplete: Promise<unknown> }) | null
             await el.updateComplete
+            await detail?.updateComplete
             expect(detail?.clearSigning).toBe(el.clearSigning)
+            expect(detail?.shadowRoot?.textContent).toContain(
+                'de2cc2f90eb523414ff54e899951dadd8789a4c07e0f71f6d6c9eaf57d412a54'
+            )
+            expect(
+                detail?.shadowRoot?.querySelector('button.btn-primary')
+            ).toHaveProperty('disabled', false)
         })
 
         it('shows no description when the transaction cannot be decoded', async () => {
@@ -248,7 +261,15 @@ describe('UserUiApprove', () => {
                 'transaction loaded'
             )
 
-            expect(el.clearSigning).toBeNull()
+            expect(el.clearSigning).toEqual({ complete: false, operations: [] })
+            const detail = el.shadowRoot?.querySelector(
+                'wg-transaction-detail'
+            ) as HTMLElement | null
+            await (detail as { updateComplete?: Promise<unknown> } | null)
+                ?.updateComplete
+            const approve =
+                detail?.shadowRoot?.querySelector('button.btn-primary')
+            expect(approve).toHaveProperty('disabled', false)
             expect(consoleError).toHaveBeenCalledWith(
                 'Error describing prepared transaction:',
                 expect.anything()

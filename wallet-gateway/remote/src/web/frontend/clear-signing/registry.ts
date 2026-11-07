@@ -2,24 +2,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
-    type Descriptor,
-    parseDescriptor,
-    type TemplateRef,
+    shippedDescriptors,
     templateKey,
+    type Descriptor,
+    type TemplateRef,
 } from '@canton-network/core-tx-clear-signing'
-import ping from './descriptors/ping.json'
-
-const BUNDLED_JSON: unknown[] = [ping]
 
 let bundled: Map<string, Descriptor> | undefined
 
 // Parsed on first use, so that a broken descriptor fails the clear-signing view, not the whole page.
 function bundledDescriptors(): Map<string, Descriptor> {
     bundled ??= new Map(
-        BUNDLED_JSON.map((json) => {
-            const descriptor = parseDescriptor(json)
-            return [templateKey(descriptor.context.template), descriptor]
-        })
+        shippedDescriptors().map((descriptor) => [
+            templateKey(descriptor.context.template),
+            descriptor,
+        ])
     )
     return bundled
 }

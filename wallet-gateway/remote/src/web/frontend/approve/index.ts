@@ -127,7 +127,8 @@ export class ApproveUi extends BaseElement {
             this.clearSigning = clearSign(this.tx, descriptors)
         } catch (error) {
             console.error('Error describing prepared transaction:', error)
-            this.clearSigning = null
+            // The detail view warns that nothing could be described. Approval stays available.
+            this.clearSigning = { complete: false, operations: [] }
         }
 
         const wallets = await userClient.request({

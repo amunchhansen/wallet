@@ -423,6 +423,9 @@ export const ClearSigned: Story = {
         await expect(
             await findByShadowRole(canvasElement, 'alert')
         ).toHaveTextContent('Parts of this transaction are not described.')
+        await expect(
+            await findByShadowRole(canvasElement, 'button', { name: 'Approve' })
+        ).toBeEnabled()
     },
 }
 
@@ -440,6 +443,7 @@ export const ClearSignedOperationKinds: Story = {
             'Archive',
             'AllocationFactory_Allocate via Splice.Api.Token.AllocationInstructionV2:AllocationFactory',
             'Splice.ExternalPartyAmuletRules:ExternalPartyAmuletRules',
+            factoryTemplate.packageId,
             // The descriptor's own claim about itself
             /^Canton ping v1\.0\.0 by\s+Digital Asset$/,
         ]) {
@@ -447,9 +451,13 @@ export const ClearSignedOperationKinds: Story = {
                 await findByShadowText(canvasElement, text)
             ).toBeInTheDocument()
         }
-        // The undescribed exercise has no descriptor, so it has no "Described by" row
+        // The undescribed exercise has no descriptor, so it has no "Described by" row.
+        // Both Ping operations show the same package ID.
         await expect(
             await findAllByShadowText(canvasElement, 'Described by')
+        ).toHaveLength(2)
+        await expect(
+            await findAllByShadowText(canvasElement, pingTemplate.packageId)
         ).toHaveLength(2)
     },
 }
@@ -462,5 +470,8 @@ export const WithoutClearSigning: Story = {
         await expect(
             queryByShadowText(canvasElement, 'What you are signing')
         ).not.toBeInTheDocument()
+        await expect(
+            await findByShadowRole(canvasElement, 'button', { name: 'Approve' })
+        ).toBeEnabled()
     },
 }

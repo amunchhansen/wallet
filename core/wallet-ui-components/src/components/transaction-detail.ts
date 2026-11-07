@@ -689,6 +689,8 @@ function renderOperationOrigin(op: OperationDescription) {
         }
         <dt class="label">${op.kind === 'exercise' ? 'On' : 'Template'}</dt>
         <dd class="identifier">${typeName(op.template)}</dd>
+        <dt class="label">Package</dt>
+        <dd class="identifier">${op.template.packageId}</dd>
         ${
             descriptor
                 ? html`<dt class="label">Described by</dt>

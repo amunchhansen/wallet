@@ -6,8 +6,5 @@
         "useDefineForClassFields": false,
         "composite": true
     },
-    "include": [
-        "src/web/frontend",
-        "src/web/frontend/clear-signing/descriptors/*.json"
-    ]
+    "include": ["src/web/frontend"]
 }
