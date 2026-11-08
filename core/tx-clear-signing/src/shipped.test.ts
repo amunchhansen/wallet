@@ -68,4 +68,20 @@ describe('shippedDescriptors', () => {
         ])
         expect(byEntity.get('Bong')).toEqual(['AbortBong', 'Ack'])
     })
+
+    it('includes AllocationFactory_Allocate on the external party amulet rules', () => {
+        const descriptor = shippedDescriptors().find(
+            (d) => d.context.template.entityName === 'ExternalPartyAmuletRules'
+        )
+
+        expect(descriptor?.context.template).toEqual({
+            packageId:
+                'fb10433a48c24f30076a7aee03a3e314b7ab02fe9a22e2069e3af92d2b6ac88a',
+            moduleName: 'Splice.ExternalPartyAmuletRules',
+            entityName: 'ExternalPartyAmuletRules',
+        })
+        expect(Object.keys(descriptor?.display.exercises ?? {})).toEqual([
+            'AllocationFactory_Allocate',
+        ])
+    })
 })

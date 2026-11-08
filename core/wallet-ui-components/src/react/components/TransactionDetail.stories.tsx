@@ -438,9 +438,8 @@ export const ClearSignedOperationKinds: Story = {
             await findAllByShadowText(canvasElement, 'Exercise')
         ).toHaveLength(2)
         for (const text of [
-            // A plain choice and an interface choice
             'Archive',
-            'AllocationFactory_Allocate via 9818a0b5b827109de03a04c8f6151cde9d1e7fe5123dbb2dfeb0e52d7271287c:Splice.Api.Token.AllocationInstructionV2:AllocationFactory',
+            'AllocationFactory_Allocate',
             'Splice.ExternalPartyAmuletRules:ExternalPartyAmuletRules',
             factoryTemplate.packageId,
             // The descriptor's own claim about itself

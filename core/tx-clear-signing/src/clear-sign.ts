@@ -43,7 +43,7 @@ export interface DescriptorInfo {
  * `kind`, `template`, `choiceId` and `interface` are read from the transaction, never from the
  * descriptor, so a descriptor cannot change what the user is told is being done. Only `intent`,
  * `fields` and `descriptor` come from the descriptor. The descriptor is chosen by `template` and,
- * for an exercise, `choiceId`. An interface the choice is exercised through is not part of that choice.
+ * for an exercise, `choiceId`. `interface` is recorded when the choice is exercised through one.
  */
 export interface OperationDescription {
     nodeId: string

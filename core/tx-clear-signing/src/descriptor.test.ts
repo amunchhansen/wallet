@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { DescriptorError, parseDescriptor } from './descriptor.js'
-import allocation from './__tests__/descriptors/amulet-allocation-factory-v2.json'
+import allocation from './descriptors/amulet-allocation-factory-v2.json'
 import ping from './__tests__/descriptors/ping.json'
 import transferOffer from './__tests__/descriptors/utility-transfer-offer.json'
 import badExerciseKey from './__tests__/descriptors/invalid/bad-exercise-key.json'

@@ -18,3 +18,4 @@ export {
 } from './descriptor.js'
 export { TransactionShapeError, type TemplateRef } from './roots.js'
 export { shippedDescriptors } from './shipped.js'
+export { twoPingPreviewTransaction } from './two-ping-preview.js'

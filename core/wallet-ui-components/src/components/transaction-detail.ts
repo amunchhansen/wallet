@@ -677,18 +677,12 @@ function typeName({ moduleName, entityName }: TemplateRef): string {
 // What the transaction itself says it does (kind, choice, template), so an operation is identified
 // even when its descriptor words it vaguely or is missing. The descriptor's own claim is kept apart.
 function renderOperationOrigin(op: OperationDescription) {
-    const { choiceId, interface: iface, descriptor } = op
+    const { choiceId, descriptor } = op
     return html`<dl class="operation-origin">
         ${
             op.kind === 'exercise' && choiceId !== undefined
                 ? html`<dt class="label">Choice</dt>
-                      <dd class="identifier">
-                          ${choiceId}${
-                              iface
-                                  ? ` via ${iface.packageId}:${typeName(iface)}`
-                                  : nothing
-                          }
-                      </dd>`
+                      <dd class="identifier">${choiceId}</dd>`
                 : nothing
         }
         <dt class="label">${op.kind === 'exercise' ? 'On' : 'Template'}</dt>

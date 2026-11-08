@@ -691,4 +691,37 @@ describe('UserUiApprove', () => {
             )
         })
     })
+
+    describe('demo previews', () => {
+        it('describes the two-leg allocation and does not load a transaction', async () => {
+            history.replaceState({}, '', '?demo=allocation')
+            el = await fixture<ApproveUi>(componentFixture)
+            await waitUntil(
+                () => el.commandId === 'allocation' && el.clearSigning !== null,
+                'allocation preview loaded'
+            )
+
+            expect(el.disabled).toBe(true)
+            expect(el.status).toBe('preview')
+            expect(el.clearSigning?.complete).toBe(true)
+            expect(mockRequest).not.toHaveBeenCalled()
+            expect(
+                el.shadowRoot?.querySelector('.alert-warning')?.textContent
+            ).toContain('not a transaction to sign')
+        })
+
+        it('describes two Ping creates and does not load a transaction', async () => {
+            history.replaceState({}, '', '?demo=two-pings')
+            el = await fixture<ApproveUi>(componentFixture)
+            await waitUntil(
+                () => el.commandId === 'two-pings',
+                'two ping preview loaded'
+            )
+
+            expect(el.disabled).toBe(true)
+            expect(el.clearSigning?.complete).toBe(true)
+            expect(el.clearSigning?.operations).toHaveLength(2)
+            expect(mockRequest).not.toHaveBeenCalled()
+        })
+    })
 })

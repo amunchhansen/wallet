@@ -21,6 +21,7 @@ const { complete, operations } = clearSign(preparedTransaction, [
 ])
 ```
 
+- `shippedDescriptors` returns the descriptors bundled with this build: the builtin Canton ping and bong templates (`Canton.Internal.Ping:Ping`, `Canton.Internal.Bong:BongProposal`, `Explode`, `Merge`, `Collapse`, `Bong`), and `AllocationFactory_Allocate` on `Splice.ExternalPartyAmuletRules:ExternalPartyAmuletRules`.
 - `parseDescriptor` validates descriptor JSON, including the rules a JSON Schema cannot express (placeholders name declared fields, enum references exist, constant paths name a scalar constant). It throws `DescriptorError`. `$schema` must be `https://example.org/canton-clear-signing/v1/schema.json`. That URL is a placeholder: this repository does not publish a JSON Schema document for it.
 - `clearSign` takes the transaction as base64, so unknown protobuf fields are refused, and returns one `OperationDescription` per root node:
     - `described`: the interpolated intent rendered;
@@ -33,15 +34,15 @@ const { complete, operations } = clearSign(preparedTransaction, [
 
 Every `OperationDescription` says what the node is, whether or not a descriptor covers it:
 
-| Field              | Value                                                                                                                          | Source      |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------ | ----------- |
-| `kind`             | `create` or `exercise`                                                                                                         | transaction |
-| `template`         | package ID, module and entity of the created or exercised template                                                             | transaction |
-| `choiceId`         | the exercised choice's name; with `template`, this selects the descriptor entry (exercise only)                                | transaction |
-| `interface`        | package ID, module and entity of the interface the choice is exercised through, if any. Not used to select the descriptor      | transaction |
-| `descriptor`       | `name`, `publisher`, `version` and `url?` from the bound descriptor's `metadata`, whether or not it has an entry for this node | descriptor  |
-| `intent`, `fields` | the wording and values                                                                                                         | descriptor  |
+| Field              | Value                                                                                                                                     | Source      |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| `kind`             | `create` or `exercise`                                                                                                                    | transaction |
+| `template`         | package ID, module and entity of the created or exercised template                                                                        | transaction |
+| `choiceId`         | the exercised choice's name; with `template`, this selects the descriptor entry (exercise only)                                           | transaction |
+| `interface`        | package ID, module and entity of the interface the choice is exercised through, if any. Recorded for later use; selection uses `choiceId` | transaction |
+| `descriptor`       | `name`, `publisher`, `version` and `url?` from the bound descriptor's `metadata`, whether or not it has an entry for this node            | descriptor  |
+| `intent`, `fields` | the wording and values                                                                                                                    | descriptor  |
 
-A wallet should show `kind`, `choiceId`, `interface` and `template` next to the intent, and show `descriptor` as the descriptor's own claim (`Described by <name> v<version> by <publisher>`). The first group is read from the signed transaction, so a descriptor cannot change which action or choice the user is told about. `descriptor` is unauthenticated in v1, because descriptors carry no verified signature yet.
+A wallet should show `kind`, `choiceId` and `template` next to the intent, and show `descriptor` as the descriptor's own claim (`Described by <name> v<version> by <publisher>`). The first group is read from the signed transaction, so a descriptor cannot change which action or choice the user is told about. `interface` is available on the result when the choice is exercised through one; showing it is left until descriptors can tell interface choices apart. `descriptor` is unauthenticated in v1, because descriptors carry no verified signature yet.
 
 The description is only as trustworthy as its binding to what is signed: compare the transaction's hash with the hash you sign (see `@canton-network/core-tx-hashing`). Transactions with unknown protobuf fields are rejected.

@@ -1,6 +1,7 @@
 // Copyright (c) 2025-2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+import amuletAllocation from './descriptors/amulet-allocation-factory-v2.json'
 import bong from './descriptors/bong.json'
 import bongProposal from './descriptors/bong-proposal.json'
 import collapse from './descriptors/collapse.json'
@@ -23,6 +24,7 @@ export function shippedDescriptors(): Descriptor[] {
         parseDescriptor(merge),
         parseDescriptor(collapse),
         parseDescriptor(bong),
+        parseDescriptor(amuletAllocation),
     ]
     return cached
 }
