@@ -1,5 +1,5 @@
 {
-    "$schema": "../../canton-clear-signing-v1.schema.json",
+    "$schema": "https://example.org/canton-clear-signing/v1/schema.json",
     "context": {
         "template": {
             "packageId": "de2cc2f90eb523414ff54e899951dadd8789a4c07e0f71f6d6c9eaf57d412a54",

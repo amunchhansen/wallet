@@ -19,8 +19,12 @@ describe('parsePath', () => {
             { kind: 'name', name: 'executors' },
             { kind: 'each' },
         ])
-        expect(parsePath('@.actAs').root).toBe('transaction')
-        expect(parsePath('$.metadata.constants.dso').root).toBe('descriptor')
+        expect(parsePath('$.metadata.constants.dso')).toEqual({
+            root: 'descriptor',
+            steps: [{ kind: 'name', name: 'dso' }],
+        })
+        expect(() => parsePath('@.actAs')).toThrow(PathError)
+        expect(() => parsePath('$.context.template')).toThrow(PathError)
     })
 
     it('reads quoted map keys, including escapes and separators', () => {

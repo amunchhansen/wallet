@@ -16,9 +16,6 @@ import paramsOnParty from './__tests__/descriptors/invalid/params-on-party.json'
 import unknownFormat from './__tests__/descriptors/invalid/unknown-format.json'
 import unknownTopLevelKey from './__tests__/descriptors/invalid/unknown-top-level-key.json'
 
-// The descriptors under __tests__/descriptors are copies of the examples in the mpa repository
-// (documentation/clearsigning/examples), which the v1 JSON Schema accepts or rejects in the same way.
-
 describe('parseDescriptor', () => {
     it.each([
         ['ping', ping],
@@ -50,6 +47,67 @@ describe('parseDescriptor', () => {
                 $schema: 'https://example.org/other.json',
             })
         ).toThrow('unsupported schema')
+        expect(() =>
+            parseDescriptor({
+                ...ping,
+                $schema: '../canton-clear-signing-v1.schema.json',
+            })
+        ).toThrow('unsupported schema')
+    })
+
+    it.each([
+        'HashVectors:Asset:Poke',
+        '7ac0650ef4d386a42bcbc7fe129f41806daa04063ff0970a5a3cdd6f4f829e68:HashVectors:Asset:Poke',
+    ])('rejects an exercise key that is not a choice name: %s', (key) => {
+        expect(() =>
+            parseDescriptor({
+                ...ping,
+                display: { exercises: { [key]: { intent: 'Poke' } } },
+            })
+        ).toThrow('display.exercises')
+    })
+
+    it('rejects a path that is not an argument, the contract, or a constant', () => {
+        expect(() =>
+            parseDescriptor({
+                ...ping,
+                display: {
+                    create: {
+                        intent: 'Ping',
+                        fields: [{ path: '@.actAs' }],
+                    },
+                },
+            })
+        ).toThrow('path')
+        expect(() =>
+            parseDescriptor({
+                ...ping,
+                display: {
+                    create: {
+                        intent: 'Ping',
+                        fields: [{ path: '$.context.template.packageId' }],
+                    },
+                },
+            })
+        ).toThrow('path')
+    })
+
+    it.each([
+        ['is missing', {}],
+        ['is null', { network: null }],
+    ])('rejects a constant that %s', (_, constants) => {
+        expect(() =>
+            parseDescriptor({
+                ...ping,
+                metadata: { ...ping.metadata, constants },
+                display: {
+                    create: {
+                        intent: 'Ping',
+                        fields: [{ path: '$.metadata.constants.network' }],
+                    },
+                },
+            })
+        ).toThrow("no constant 'network'")
     })
 
     it.each([

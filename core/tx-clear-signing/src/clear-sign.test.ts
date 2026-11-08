@@ -9,7 +9,7 @@ import {
 import { decodePreparedTransaction } from '@canton-network/core-tx-visualizer'
 import { clearSign } from './clear-sign.js'
 import { parseDescriptor } from './descriptor.js'
-import { requiredTemplates, TransactionShapeError } from './roots.js'
+import { TransactionShapeError } from './roots.js'
 import {
     OTHER,
     OWNER,
@@ -36,6 +36,15 @@ const PING_DESCRIPTOR = {
     name: 'Canton ping',
     publisher: '<canton publisher>',
     version: '1.0.0',
+}
+
+function encode(tx: PreparedTransaction): string {
+    const bytes = PreparedTransaction.toBinary(tx)
+    let binary = ''
+    for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]!)
+    }
+    return btoa(binary)
 }
 
 // A Respond exercise on the Ping that builtinPingCreate creates, with that Ping as input contract.
@@ -88,40 +97,13 @@ function respondToPing(): PreparedTransaction {
     })
 }
 
-describe('requiredTemplates', () => {
-    it('returns the template of the root node', () => {
-        expect(requiredTemplates(builtinPingCreate)).toEqual([
-            ping.context.template,
-        ])
-    })
-
-    it('returns each root template once, ignoring child nodes', () => {
-        expect(
-            requiredTemplates(createAndExercise.preparedTransaction)
-        ).toEqual([
-            {
-                packageId: VECTOR_PACKAGE,
-                moduleName: 'HashVectors',
-                entityName: 'Plain',
-            },
-        ])
-        expect(requiredTemplates(nestedCreates.preparedTransaction)).toEqual([
-            {
-                packageId: VECTOR_PACKAGE,
-                moduleName: 'HashVectors',
-                entityName: 'Driver',
-            },
-        ])
-    })
-
-    it('rejects a transaction without a transaction tree', () => {
-        expect(() => requiredTemplates(PreparedTransaction.create())).toThrow(
-            TransactionShapeError
-        )
-    })
-})
-
 describe('clearSign', () => {
+    it('rejects a transaction without a transaction tree', () => {
+        expect(() =>
+            clearSign(encode(PreparedTransaction.create()), [])
+        ).toThrow(TransactionShapeError)
+    })
+
     it('describes a Ping create', () => {
         const result = clearSign(builtinPingCreate, [ping])
         expect(result).toEqual({
@@ -160,16 +142,14 @@ describe('clearSign', () => {
         const [op] = clearSign(builtinPingCreate, []).operations
         expect(op).toMatchObject({ kind: 'create', status: 'undescribed' })
         expect(op).not.toHaveProperty('descriptor')
-        expect(op).not.toHaveProperty('choice')
         expect(op).not.toHaveProperty('choiceId')
         expect(op).not.toHaveProperty('interface')
     })
 
     it('reads the exercised contract through @.contract', () => {
-        const [op] = clearSign(respondToPing(), [ping]).operations
+        const [op] = clearSign(encode(respondToPing()), [ping]).operations
         expect(op).toMatchObject({
             kind: 'exercise',
-            choice: 'Respond',
             choiceId: 'Respond',
             descriptor: PING_DESCRIPTOR,
             status: 'described',
@@ -179,10 +159,9 @@ describe('clearSign', () => {
     })
 
     it('identifies an exercise without a descriptor', () => {
-        const [op] = clearSign(respondToPing(), []).operations
+        const [op] = clearSign(encode(respondToPing()), []).operations
         expect(op).toMatchObject({
             kind: 'exercise',
-            choice: 'Respond',
             choiceId: 'Respond',
             status: 'undescribed',
         })
@@ -194,7 +173,9 @@ describe('clearSign', () => {
             ...pingJson,
             display: { create: pingJson.display.create },
         })
-        const [op] = clearSign(respondToPing(), [createsOnly]).operations
+        const [op] = clearSign(encode(respondToPing()), [
+            createsOnly,
+        ]).operations
         expect(op).toMatchObject({
             status: 'undescribed',
             intent: 'Exercise Respond on Canton.Internal.Ping:Ping',
@@ -202,25 +183,21 @@ describe('clearSign', () => {
         })
     })
 
-    it('keys an interface choice by the interface', () => {
-        const plain = (exercises: unknown) =>
+    it('describes an interface choice by the template and the choice name', () => {
+        const poke = {
+            intent: 'Poke',
+            interpolatedIntent: 'Poke the asset of {@.contract.owner}',
+        }
+        const [op] = clearSign(exerciseInterface.preparedTransaction, [
             vectorDescriptor('Plain', {
                 create: {
                     intent: 'Plain',
                     fields: [{ path: 'owner', format: 'party' }],
                 },
-                exercises,
-            })
-        const poke = {
-            intent: 'Poke',
-            interpolatedIntent: 'Poke the asset of {@.contract.owner}',
-        }
-
-        const byInterface = clearSign(exerciseInterface.preparedTransaction, [
-            plain({ 'HashVectors:Asset:Poke': poke }),
-        ])
-        expect(byInterface.operations[0]).toMatchObject({
-            choice: 'HashVectors:Asset:Poke',
+                exercises: { Poke: poke },
+            }),
+        ]).operations
+        expect(op).toMatchObject({
             choiceId: 'Poke',
             interface: {
                 packageId: VECTOR_PACKAGE,
@@ -230,11 +207,47 @@ describe('clearSign', () => {
             status: 'described',
             intent: `Poke the asset of ${OWNER}`,
         })
+    })
 
-        const byChoiceName = clearSign(exerciseInterface.preparedTransaction, [
-            plain({ Poke: poke }),
-        ])
-        expect(byChoiceName.operations[0]?.status).toBe('undescribed')
+    it('rejects a contract id that occurs twice', () => {
+        const tx = respondToPing()
+        const input = tx.metadata?.inputContracts[0]?.contract
+        const nodes = tx.transaction?.nodes
+        if (input?.oneofKind !== 'v1' || !nodes) {
+            throw new Error('fixture has no input contract')
+        }
+        nodes.push({
+            nodeId: '1',
+            versionedNode: {
+                oneofKind: 'v1',
+                v1: {
+                    nodeType: { oneofKind: 'create', create: input.v1 },
+                },
+            },
+        })
+        expect(() => clearSign(encode(tx), [ping])).toThrow(/occurs 2 times/)
+    })
+
+    it('rejects a contract whose template name differs from the exercise', () => {
+        const tx = respondToPing()
+        const input = tx.metadata?.inputContracts[0]?.contract
+        if (input?.oneofKind !== 'v1' || !input.v1.templateId) {
+            throw new Error('fixture has no input contract')
+        }
+        input.v1.templateId.entityName = 'Other'
+        expect(() => clearSign(encode(tx), [ping])).toThrow(
+            "is 'Canton.Internal.Ping:Other', not 'Canton.Internal.Ping:Ping'"
+        )
+    })
+
+    it('allows a contract whose package differs from the exercise', () => {
+        const tx = respondToPing()
+        const input = tx.metadata?.inputContracts[0]?.contract
+        if (input?.oneofKind !== 'v1' || !input.v1.templateId) {
+            throw new Error('fixture has no input contract')
+        }
+        input.v1.templateId.packageId = '0'.repeat(64)
+        expect(clearSign(encode(tx), [ping]).complete).toBe(true)
     })
 
     it('describes every root, finding a contract created in the same transaction', () => {

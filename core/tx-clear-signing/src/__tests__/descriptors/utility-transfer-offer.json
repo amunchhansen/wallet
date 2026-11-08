@@ -1,5 +1,5 @@
 {
-    "$schema": "../canton-clear-signing-v1.schema.json",
+    "$schema": "https://example.org/canton-clear-signing/v1/schema.json",
     "context": {
         "template": {
             "packageId": "661151768d69141dfd6b757bdc348012b2a64b2c956ad586782f97d07408f264",
@@ -45,7 +45,7 @@
             ]
         },
         "exercises": {
-            "Splice.Api.Token.TransferInstructionV1:TransferInstruction:TransferInstruction_Accept": {
+            "TransferInstruction_Accept": {
                 "intent": "Accept transfer offer",
                 "interpolatedIntent": "Accept {@.contract.transfer.amount} {@.contract.transfer.instrumentId.id} from {@.contract.transfer.sender} to {@.contract.transfer.receiver}, settled according to the transfer rule at {extraArgs.context.values[\"utility.digitalasset.com/transfer-rule\"].AV_ContractId}",
                 "fields": [
@@ -56,7 +56,7 @@
                     }
                 ]
             },
-            "Splice.Api.Token.TransferInstructionV1:TransferInstruction:TransferInstruction_Reject": {
+            "TransferInstruction_Reject": {
                 "intent": "Reject transfer offer",
                 "interpolatedIntent": "Reject {@.contract.transfer.amount} {@.contract.transfer.instrumentId.id} from {@.contract.transfer.sender}"
             }

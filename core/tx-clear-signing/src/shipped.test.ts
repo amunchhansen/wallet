@@ -3,7 +3,6 @@
 
 import { describe, expect, it } from 'vitest'
 import { clearSign } from './clear-sign.js'
-import { templateKey } from './roots.js'
 import { builtinPingCreate } from './__tests__/fixtures/ping.js'
 import { shippedDescriptors } from './shipped.js'
 
@@ -36,9 +35,6 @@ describe('shippedDescriptors', () => {
             moduleName: 'Canton.Internal.Bong',
             entityName: 'BongProposal',
         })
-        expect(templateKey(descriptor!.context.template)).toBe(
-            `${pingPackageId}:Canton.Internal.Bong:BongProposal`
-        )
         expect(Object.keys(descriptor?.display.exercises ?? {}).sort()).toEqual(
             ['AbortBongProposal', 'Accept']
         )

@@ -10,22 +10,19 @@ The descriptor format is the v1 _Canton Clear Signing Descriptor_ schema, modell
 import {
     clearSign,
     parseDescriptor,
-    requiredTemplates,
+    shippedDescriptors,
 } from '@canton-network/core-tx-clear-signing'
 
-// preparedTransaction: base64, as returned by /v2/interactive-submission/prepare
-const needed = requiredTemplates(preparedTransaction)
-const descriptors = needed.flatMap(lookUpDescriptorJson).map(parseDescriptor)
-
-const { complete, operations } = clearSign(preparedTransaction, descriptors)
-for (const op of operations) {
-    console.log(op.status, op.intent, op.fields)
-}
+// preparedTransaction: base64, as returned by /v2/interactive-submission/prepare.
+// Pass every descriptor this build trusts. clearSign binds each one by package ID, module and entity.
+const { complete, operations } = clearSign(preparedTransaction, [
+    ...shippedDescriptors(),
+    parseDescriptor(descriptorJson),
+])
 ```
 
-- `requiredTemplates` returns the template of each root node, de-duplicated.
-- `parseDescriptor` validates descriptor JSON, including the rules a JSON Schema cannot express (placeholders name declared fields, enum references exist). It throws `DescriptorError`.
-- `clearSign` returns one `OperationDescription` per root node:
+- `parseDescriptor` validates descriptor JSON, including the rules a JSON Schema cannot express (placeholders name declared fields, enum references exist, constant paths name a scalar constant). It throws `DescriptorError`. `$schema` must be `https://example.org/canton-clear-signing/v1/schema.json`. That URL is a placeholder: this repository does not publish a JSON Schema document for it.
+- `clearSign` takes the transaction as base64, so unknown protobuf fields are refused, and returns one `OperationDescription` per root node:
     - `described`: the interpolated intent rendered;
     - `fallback`: a placeholder did not resolve, so `intent` is the descriptor's stable intent;
     - `undescribed`: no descriptor covers the node, so `intent` is generic (`Create Module:Entity`).
@@ -40,9 +37,8 @@ Every `OperationDescription` says what the node is, whether or not a descriptor 
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------ | ----------- |
 | `kind`             | `create` or `exercise`                                                                                                         | transaction |
 | `template`         | package ID, module and entity of the created or exercised template                                                             | transaction |
-| `choiceId`         | the exercised choice's own name (exercise only)                                                                                | transaction |
-| `interface`        | the interface the choice is exercised through, if any (exercise only)                                                          | transaction |
-| `choice`           | the descriptor lookup key: `choiceId`, or `Module:Entity:ChoiceId` of the interface when there is one                          | transaction |
+| `choiceId`         | the exercised choice's name; with `template`, this selects the descriptor entry (exercise only)                                | transaction |
+| `interface`        | package ID, module and entity of the interface the choice is exercised through, if any. Not used to select the descriptor      | transaction |
 | `descriptor`       | `name`, `publisher`, `version` and `url?` from the bound descriptor's `metadata`, whether or not it has an entry for this node | descriptor  |
 | `intent`, `fields` | the wording and values                                                                                                         | descriptor  |
 

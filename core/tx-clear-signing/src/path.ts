@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Value } from '@canton-network/core-ledger-proto'
-import { CONTRACT_PREFIX } from './intent.js'
+import { CONSTANT_PREFIX, CONTRACT_PREFIX } from './intent.js'
 
 export type Step =
     | { kind: 'name'; name: string }
     | { kind: 'key'; key: string }
     | { kind: 'each' }
 
-export type PathRoot = 'argument' | 'contract' | 'transaction' | 'descriptor'
+export type PathRoot = 'argument' | 'contract' | 'descriptor'
 
 export interface ParsedPath {
     root: PathRoot
@@ -37,12 +37,11 @@ export function parsePath(path: string): ParsedPath {
     if (path.startsWith(CONTRACT_PREFIX)) {
         root = 'contract'
         rest = path.slice(CONTRACT_PREFIX.length)
-    } else if (path.startsWith('@.')) {
-        root = 'transaction'
-        rest = path.slice(2)
-    } else if (path.startsWith('$.')) {
+    } else if (path.startsWith(CONSTANT_PREFIX)) {
         root = 'descriptor'
-        rest = path.slice(2)
+        rest = path.slice(CONSTANT_PREFIX.length)
+    } else if (path.startsWith('@.') || path.startsWith('$.')) {
+        throw new PathError(`unsupported path root in '${path}'`)
     }
 
     const steps: Step[] = []

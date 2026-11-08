@@ -16,7 +16,6 @@ import {
     clearSign,
     type ClearSigningResult,
     shippedDescriptors,
-    twoPingPreviewTransaction,
 } from '@canton-network/core-tx-clear-signing'
 import { createUserClient } from '../rpc-client'
 import { setLocationHref } from '../navigation.js'
@@ -51,7 +50,6 @@ export class ApproveUi extends BaseElement {
     @state() accessor origin: string | null = null
     @state() accessor canSubmit = true
     @state() accessor walletCapabilityMessage: string | null = null
-    @state() accessor previewNotice: string | null = null
 
     @state() accessor externalTxId: string | null = null
     @state() accessor failureReason: string | null = null
@@ -63,10 +61,6 @@ export class ApproveUi extends BaseElement {
     connectedCallback(): void {
         super.connectedCallback()
         const url = new URL(window.location.href)
-        if (url.searchParams.get('demo') === 'two-pings') {
-            this.showTwoPingPreview()
-            return
-        }
         this.transactionId = url.searchParams.get('transactionId') || ''
         this.pollDelay = POLL_INTERVAL_MS
         document.addEventListener('visibilitychange', this.onVisibilityChange)
@@ -97,27 +91,6 @@ export class ApproveUi extends BaseElement {
                 setLocationHref(toRelHref(ACTIVITIES_PAGE_REDIRECT))
             }
         }, 2000)
-    }
-
-    private showTwoPingPreview() {
-        this.previewNotice =
-            'This is a preview. The participant cannot prepare more than one command, so this transaction is not submitted.'
-        this.commandId = 'two-pings'
-        this.status = 'preview'
-        this.disabled = true
-        this.tx = twoPingPreviewTransaction()
-        try {
-            this.txParsed = parsePreparedTransaction(this.tx)
-        } catch (error) {
-            console.error('Error parsing prepared transaction:', error)
-            this.txParsed = null
-        }
-        try {
-            this.clearSigning = clearSign(this.tx, shippedDescriptors())
-        } catch (error) {
-            console.error('Error describing prepared transaction:', error)
-            this.clearSigning = { complete: false, operations: [] }
-        }
     }
 
     private async updateState() {
@@ -367,13 +340,6 @@ export class ApproveUi extends BaseElement {
 
     protected render() {
         return html`
-            ${
-                this.previewNotice
-                    ? html`<div class="alert alert-warning" role="alert">
-                          ${this.previewNotice}
-                      </div>`
-                    : ''
-            }
             ${
                 this.walletCapabilityMessage
                     ? html`<div class="alert alert-warning" role="alert">

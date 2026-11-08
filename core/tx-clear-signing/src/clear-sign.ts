@@ -40,17 +40,16 @@ export interface DescriptorInfo {
 }
 
 /**
- * `kind`, `template`, `choice`, `choiceId` and `interface` are read from the transaction, never from
- * the descriptor, so a descriptor cannot change what the user is told is being done. Only `intent`,
- * `fields` and `descriptor` come from the descriptor.
+ * `kind`, `template`, `choiceId` and `interface` are read from the transaction, never from the
+ * descriptor, so a descriptor cannot change what the user is told is being done. Only `intent`,
+ * `fields` and `descriptor` come from the descriptor. The descriptor is chosen by `template` and,
+ * for an exercise, `choiceId`. An interface the choice is exercised through is not part of that choice.
  */
 export interface OperationDescription {
     nodeId: string
     kind: 'create' | 'exercise'
     template: TemplateRef
-    /** The exercise key used to look up the operation: the choice, or `Module:Entity:Choice` of its interface. */
-    choice?: string
-    /** The exercised choice's own name, without the interface. */
+    /** The exercised choice's name. Absent for a create. */
     choiceId?: string
     /** The interface the choice belongs to, when it is exercised through one. */
     interface?: TemplateRef
@@ -85,8 +84,8 @@ interface Scope {
  * @throws Error when two descriptors bind the same template, or the transaction is malformed
  */
 export function clearSign(
-    tx: string | PreparedTransaction,
-    descriptors: Descriptor[]
+    tx: string,
+    descriptors: readonly Descriptor[]
 ): ClearSigningResult {
     const prepared = decode(tx)
     const byTemplate = new Map<string, Descriptor>()
@@ -145,30 +144,26 @@ function describeNode(
 
     const exercise = node.exercise
     const iface = exercise.interfaceId
-    const choice = iface
-        ? `${iface.moduleName}:${iface.entityName}:${exercise.choiceId}`
-        : exercise.choiceId
     const base = {
         nodeId: node.nodeId,
         kind: node.kind,
         template,
-        choice,
         choiceId: exercise.choiceId,
         ...(iface && { interface: templateRef(iface, node.nodeId) }),
         ...bound,
     }
-    const op = descriptor?.display.exercises?.[choice]
+    const op = descriptor?.display.exercises?.[exercise.choiceId]
     if (!descriptor || !op) {
         return {
             ...base,
             status: 'undescribed',
-            intent: `Exercise ${choice} on ${typeName}`,
+            intent: `Exercise ${exercise.choiceId} on ${typeName}`,
             fields: [],
         }
     }
     const scope = {
         argument: exercise.chosenValue,
-        contract: contractArgument(tx, exercise.contractId),
+        contract: contractArgument(tx, exercise.contractId, template),
         descriptor,
     }
     return { ...base, ...describeOperation(op, scope) }
@@ -264,10 +259,11 @@ function renderField(
             start = scope.contract
             break
         case 'descriptor':
-            start = descriptorValue(scope.descriptor, steps.map(stepName))
-            return formatValue(present(start, path), field, enums(scope))
-        case 'transaction':
-            throw new PathError(`'${path}': only '@.contract.' is supported`)
+            return formatValue(
+                present(constantValue(scope.descriptor, steps), path),
+                field,
+                enums(scope)
+            )
     }
     const { values, isList } = resolvePath(present(start, path), steps)
     const formatted = values.map((v) => formatValue(v, field, enums(scope)))
@@ -290,30 +286,16 @@ function present(v: Value | undefined, path: string): Value {
     return v
 }
 
-function stepName(step: Step): string {
-    if (step.kind !== 'name') {
-        throw new PathError('descriptor paths only have name steps')
-    }
-    return step.name
-}
-
-// `$.` paths read scalar values from the descriptor, e.g. $.metadata.constants.NAME. They are shown as
-// text, numeric or bool values so that the formatters apply to them unchanged.
-function descriptorValue(
+function constantValue(
     descriptor: Descriptor,
-    names: string[]
+    steps: Step[]
 ): Value | undefined {
-    let current: unknown = descriptor
-    for (const name of names) {
-        if (
-            typeof current !== 'object' ||
-            current === null ||
-            !Object.hasOwn(current, name)
-        ) {
-            return undefined
-        }
-        current = (current as Record<string, unknown>)[name]
-    }
+    const step = steps.length === 1 ? steps[0] : undefined
+    const constants = descriptor.metadata.constants
+    if (step?.kind !== 'name' || constants === undefined) return undefined
+    const current = Object.hasOwn(constants, step.name)
+        ? constants[step.name]
+        : undefined
     switch (typeof current) {
         case 'string':
             return { sum: { oneofKind: 'text', text: current } }

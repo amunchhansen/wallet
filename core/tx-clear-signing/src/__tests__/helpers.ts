@@ -11,14 +11,13 @@ export const OWNER =
 export const OTHER =
     'hash-vectors-other::122034539ff7a7f4d1754374fd16165642ea6eecb54acef3f7d32f67e188273f8916'
 
-/** A descriptor for a HashVectors template of the vectors' package. */
 export function vectorDescriptor(
     entityName: string,
     display: unknown,
     enums?: Record<string, Record<string, string>>
 ): Descriptor {
     return parseDescriptor({
-        $schema: '../canton-clear-signing-v1.schema.json',
+        $schema: 'https://example.org/canton-clear-signing/v1/schema.json',
         context: {
             template: {
                 packageId: VECTOR_PACKAGE,

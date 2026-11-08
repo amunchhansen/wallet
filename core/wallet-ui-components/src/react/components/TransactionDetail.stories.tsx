@@ -375,7 +375,6 @@ const clearSigning: ClearSigningResult = {
             nodeId: '1',
             kind: 'exercise',
             template: pingTemplate,
-            choice: 'Archive',
             choiceId: 'Archive',
             status: 'undescribed',
             intent: 'Exercise Archive on Canton.Internal.Ping:Ping',
@@ -385,10 +384,10 @@ const clearSigning: ClearSigningResult = {
             nodeId: '2',
             kind: 'exercise',
             template: factoryTemplate,
-            choice: 'Splice.Api.Token.AllocationInstructionV2:AllocationFactory:AllocationFactory_Allocate',
             choiceId: 'AllocationFactory_Allocate',
             interface: {
-                ...factoryTemplate,
+                packageId:
+                    '9818a0b5b827109de03a04c8f6151cde9d1e7fe5123dbb2dfeb0e52d7271287c',
                 moduleName: 'Splice.Api.Token.AllocationInstructionV2',
                 entityName: 'AllocationFactory',
             },
@@ -441,7 +440,7 @@ export const ClearSignedOperationKinds: Story = {
         for (const text of [
             // A plain choice and an interface choice
             'Archive',
-            'AllocationFactory_Allocate via Splice.Api.Token.AllocationInstructionV2:AllocationFactory',
+            'AllocationFactory_Allocate via 9818a0b5b827109de03a04c8f6151cde9d1e7fe5123dbb2dfeb0e52d7271287c:Splice.Api.Token.AllocationInstructionV2:AllocationFactory',
             'Splice.ExternalPartyAmuletRules:ExternalPartyAmuletRules',
             factoryTemplate.packageId,
             // The descriptor's own claim about itself

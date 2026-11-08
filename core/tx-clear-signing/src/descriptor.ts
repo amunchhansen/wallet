@@ -2,12 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { z } from 'zod'
-import { CONTRACT_PREFIX, parseIntent } from './intent.js'
+import { CONSTANT_PREFIX, CONTRACT_PREFIX, parseIntent } from './intent.js'
 
-/** `$id` of the v1 descriptor JSON Schema. */
-export const SCHEMA_ID =
-    'https://example.org/canton-clear-signing/v1/schema.json'
-const SCHEMA_FILE = 'canton-clear-signing-v1.schema.json'
+const SCHEMA_ID = 'https://example.org/canton-clear-signing/v1/schema.json'
 
 const NAME = '[A-Za-z_][A-Za-z0-9_]*'
 const DOTTED_NAME = `${NAME}(\\.${NAME})*`
@@ -16,14 +13,16 @@ const STEP = `(${NAME}(${MAP_KEY})*|\\[\\])`
 
 const identifier = new RegExp(`^${NAME}$`)
 const dottedName = new RegExp(`^${DOTTED_NAME}$`)
-const exerciseKey = new RegExp(`^(${NAME}|${DOTTED_NAME}:${NAME}:${NAME})$`)
-const pathPattern = new RegExp(`^(@\\.|\\$\\.)?${STEP}(\\.${STEP})*$`)
+const ARGUMENT_PATH = `${STEP}(\\.${STEP})*`
+const pathPattern = new RegExp(
+    `^(${ARGUMENT_PATH}|@\\.contract\\.${ARGUMENT_PATH}|\\$\\.metadata\\.constants\\.${NAME})$`
+)
 const enumRef = new RegExp(`^\\$\\.metadata\\.enums\\.${NAME}$`)
 const semver =
     /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$/
 const nonBlank = /\S/
 
-export const FORMATS = [
+const FORMATS = [
     'string',
     'number',
     'boolean',
@@ -61,12 +60,10 @@ const EnumTableSchema = z
         message: 'an enum table needs at least one entry',
     })
 
-export const DescriptorSchema = z.strictObject({
-    $schema: z
-        .string()
-        .refine((s) => s === SCHEMA_ID || s.endsWith(SCHEMA_FILE), {
-            message: `unsupported schema; expected '${SCHEMA_ID}'`,
-        }),
+const DescriptorSchema = z.strictObject({
+    $schema: z.string().refine((s) => s === SCHEMA_ID, {
+        message: `unsupported schema; expected '${SCHEMA_ID}'`,
+    }),
     $comment: z.string().optional(),
     context: z.strictObject({
         template: z.strictObject({
@@ -94,7 +91,7 @@ export const DescriptorSchema = z.strictObject({
         .strictObject({
             create: OperationSchema.optional(),
             exercises: z
-                .record(z.string().regex(exerciseKey), OperationSchema)
+                .record(z.string().regex(identifier), OperationSchema)
                 .optional(),
         })
         .refine((d) => d.create !== undefined || d.exercises !== undefined, {
@@ -118,7 +115,8 @@ export class DescriptorError extends Error {
 /**
  * Validates descriptor JSON against the v1 descriptor format, including the rules JSON Schema cannot
  * express: every placeholder equals the path of a declared field, contract fields are declared once in
- * `create` and read as `{@.contract.<path>}` from an exercise, and every enum reference exists.
+ * `create` and read as `{@.contract.<path>}` from an exercise, every enum reference exists, and every
+ * `$.metadata.constants` path names a string, number or boolean constant.
  *
  * @throws DescriptorError listing every problem found
  */
@@ -178,6 +176,10 @@ function operationProblems(
                 `${where}: field '${f.path}' reads the contract; declare it in create`
             )
         }
+        const constant = constantProblem(d, f.path)
+        if (constant !== undefined) {
+            problems.push(`${where}: field '${f.path}' ${constant}`)
+        }
         const enumName = f.params?.$ref.slice('$.metadata.enums.'.length)
         if (
             enumName !== undefined &&
@@ -217,6 +219,20 @@ function operationProblems(
         }
     }
     return problems
+}
+
+function constantProblem(d: Descriptor, path: string): string | undefined {
+    if (!path.startsWith(CONSTANT_PREFIX)) return undefined
+    const name = path.slice(CONSTANT_PREFIX.length)
+    const value = d.metadata.constants?.[name]
+    if (
+        typeof value === 'string' ||
+        typeof value === 'number' ||
+        typeof value === 'boolean'
+    ) {
+        return undefined
+    }
+    return `has no constant '${name}'`
 }
 
 function fieldPaths(op: Operation): string[] {

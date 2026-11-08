@@ -29,10 +29,8 @@ export class TransactionShapeError extends Error {
 }
 
 // Unknown fields could carry content the user is never shown, so decoding refuses them.
-export function decode(tx: string | PreparedTransaction): PreparedTransaction {
-    return typeof tx === 'string'
-        ? decodePreparedTransaction(tx, { readUnknownField: 'throw' })
-        : tx
+export function decode(tx: string): PreparedTransaction {
+    return decodePreparedTransaction(tx, { readUnknownField: 'throw' })
 }
 
 /**
@@ -96,35 +94,25 @@ export function templateKey(t: TemplateRef): string {
 }
 
 /**
- * Which templates need a descriptor to describe the transaction: the template of each root node,
- * de-duplicated, in root order.
- */
-export function requiredTemplates(
-    tx: string | PreparedTransaction
-): TemplateRef[] {
-    const byKey = new Map<string, TemplateRef>()
-    for (const node of rootNodes(decode(tx))) {
-        const ref = rootTemplate(node)
-        byKey.set(templateKey(ref), ref)
-    }
-    return [...byKey.values()]
-}
-
-/**
- * The create argument of a contract the transaction uses: an input contract, or one created by a
- * node of the same transaction.
+ * The create argument of the contract an exercise uses: an input contract, or one created by a node
+ * of the same transaction. Its module and entity must be the exercise's. Its package may differ,
+ * because an upgrade keeps the name and changes the package.
+ *
+ * @throws TransactionShapeError when the contract id occurs more than once, or names another template
  */
 export function contractArgument(
     tx: PreparedTransaction,
-    contractId: string
+    contractId: string,
+    template: TemplateRef
 ): Value | undefined {
+    const found: Create[] = []
     for (const input of tx.metadata?.inputContracts ?? []) {
         const contract = input.contract
         if (
             contract.oneofKind === 'v1' &&
             contract.v1.contractId === contractId
         ) {
-            return contract.v1.argument
+            found.push(contract.v1)
         }
     }
     for (const node of tx.transaction?.nodes ?? []) {
@@ -135,8 +123,23 @@ export function contractArgument(
             nodeType.oneofKind === 'create' &&
             nodeType.create.contractId === contractId
         ) {
-            return nodeType.create.argument
+            found.push(nodeType.create)
         }
     }
-    return undefined
+    if (found.length > 1) {
+        throw new TransactionShapeError(
+            `contract '${contractId}' occurs ${found.length} times`
+        )
+    }
+    const create = found[0]
+    if (!create) return undefined
+    const id = create.templateId
+    const name = `${id?.moduleName}:${id?.entityName}`
+    const expected = `${template.moduleName}:${template.entityName}`
+    if (!id || name !== expected) {
+        throw new TransactionShapeError(
+            `contract '${contractId}' is '${name}', not '${expected}'`
+        )
+    }
+    return create.argument
 }

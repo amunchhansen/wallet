@@ -1,5 +1,5 @@
 {
-    "$schema": "../canton-clear-signing-v1.schema.json",
+    "$schema": "https://example.org/canton-clear-signing/v1/schema.json",
     "context": {
         "template": {
             "packageId": "fb10433a48c24f30076a7aee03a3e314b7ab02fe9a22e2069e3af92d2b6ac88a",
@@ -31,7 +31,7 @@
             ]
         },
         "exercises": {
-            "Splice.Api.Token.AllocationInstructionV2:AllocationFactory:AllocationFactory_Allocate": {
+            "AllocationFactory_Allocate": {
                 "intent": "Allocate funds for a settlement",
                 "interpolatedIntent": "Allocate funds at {@.contract.dso} for settlement {settlement.id} of {allocation.transferLegSides.length} transfer legs, authorized by {allocation.authorizer.owner} and settled by {settlement.executors.[]}. {allocation.committed}",
                 "fields": [

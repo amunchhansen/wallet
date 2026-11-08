@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 export const CONTRACT_PREFIX = '@.contract.'
+export const CONSTANT_PREFIX = '$.metadata.constants.'
 
 export type IntentSegment =
     | { kind: 'text'; text: string }

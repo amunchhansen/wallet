@@ -107,7 +107,7 @@ export class TransactionService {
             signParams.transactionId
         )
         await this.assertHashBinding(tx)
-        this.assertClearSigning(tx)
+        this.warnIfNotFullyDescribed(tx)
 
         const baseSignParams = {
             tx: tx.preparedTransaction,
@@ -506,12 +506,13 @@ export class TransactionService {
      * The approval page shows an incomplete description and leaves the decision to the user.
      * Record that this build could not explain the bytes, then sign them anyway.
      */
-    private assertClearSigning(tx: Transaction): void {
+    private warnIfNotFullyDescribed(tx: Transaction): void {
         let result: ClearSigningResult
         try {
-            result = clearSign(tx.preparedTransaction, [
-                ...this.clearSigningDescriptors,
-            ])
+            result = clearSign(
+                tx.preparedTransaction,
+                this.clearSigningDescriptors
+            )
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err)
             this.logger.warn(
@@ -693,7 +694,7 @@ export class TransactionService {
             }
 
             await this.assertHashBinding(transaction)
-            this.assertClearSigning(transaction)
+            this.warnIfNotFullyDescribed(transaction)
 
             const { signature } = await driver
                 .signTransaction({

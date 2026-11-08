@@ -1,5 +1,5 @@
 {
-    "$schema": "../../canton-clear-signing-v1.schema.json",
+    "$schema": "https://example.org/canton-clear-signing/v1/schema.json",
     "context": {
         "template": {
             "moduleName": "Canton.Internal.Ping",

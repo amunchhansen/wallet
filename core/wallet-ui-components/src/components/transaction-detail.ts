@@ -683,7 +683,11 @@ function renderOperationOrigin(op: OperationDescription) {
             op.kind === 'exercise' && choiceId !== undefined
                 ? html`<dt class="label">Choice</dt>
                       <dd class="identifier">
-                          ${choiceId}${iface ? ` via ${typeName(iface)}` : nothing}
+                          ${choiceId}${
+                              iface
+                                  ? ` via ${iface.packageId}:${typeName(iface)}`
+                                  : nothing
+                          }
                       </dd>`
                 : nothing
         }
