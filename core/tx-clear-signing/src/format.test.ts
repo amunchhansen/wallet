@@ -94,4 +94,53 @@ describe('formatValue', () => {
     it('shows a value without format as raw', () => {
         expect(formatValue(int64('5'), field(undefined), {})).toBe('5')
     })
+
+    it('shows a list of records as key-value JSON', () => {
+        const party = (p: string): Value => ({
+            sum: { oneofKind: 'party', party: p },
+        })
+        const numeric = (n: string): Value => ({
+            sum: { oneofKind: 'numeric', numeric: n },
+        })
+        const none: Value = { sum: { oneofKind: 'optional', optional: {} } }
+        const some = (value: Value): Value => ({
+            sum: { oneofKind: 'optional', optional: { value } },
+        })
+        const rec = (fields: { label: string; value: Value }[]): Value => ({
+            sum: { oneofKind: 'record', record: { fields } },
+        })
+        const side: Value = {
+            sum: { oneofKind: 'enum', enum: { constructor: 'SenderSide' } },
+        }
+        const legs: Value = {
+            sum: {
+                oneofKind: 'list',
+                list: {
+                    elements: [
+                        rec([
+                            { label: 'transferLegId', value: text('leg-1') },
+                            { label: 'side', value: side },
+                            {
+                                label: 'otherside',
+                                value: rec([
+                                    {
+                                        label: 'owner',
+                                        value: some(party('alice::1')),
+                                    },
+                                    { label: 'provider', value: none },
+                                ]),
+                            },
+                            {
+                                label: 'amount',
+                                value: numeric('0.3000000000'),
+                            },
+                        ]),
+                    ],
+                },
+            },
+        }
+        expect(formatValue(legs, field('raw'), {})).toBe(
+            '[{"transferLegId":"leg-1","side":"SenderSide","otherside":{"owner":"alice::1","provider":null},"amount":"0.3000000000"}]'
+        )
+    })
 })

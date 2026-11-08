@@ -119,17 +119,28 @@ describe('AllocationFactory_Allocate', () => {
             },
         })
         expect(op?.intent).toContain('of 2 transfer legs')
-        expect(field(op, 'allocation.transferLegSides.[].side')).toEqual([
-            'send to',
-            'receive from',
+        const legs = field(op, 'allocation.transferLegSides')
+        expect(legs).toEqual(expect.any(String))
+        expect(JSON.parse(legs as string)).toMatchObject([
+            {
+                transferLegId: 'leg-1',
+                side: 'SenderSide',
+                amount: '0.3000000000',
+                instrumentId: 'Amulet',
+                otherside: {
+                    owner: 'bd::1220cb1468d149d30ad6f674acb2f6769dd2a6e6e1b90346fd4905fed66f37b2de56',
+                },
+            },
+            {
+                transferLegId: 'leg-2',
+                side: 'ReceiverSide',
+                amount: '0.1000000000',
+                instrumentId: 'Amulet',
+                otherside: {
+                    owner: 'bd::1220cb1468d149d30ad6f674acb2f6769dd2a6e6e1b90346fd4905fed66f37b2de56',
+                },
+            },
         ])
-        expect(field(op, 'allocation.transferLegSides.[].amount')).toEqual([
-            '0.3000000000',
-            '0.1000000000',
-        ])
-        expect(
-            field(op, 'allocation.transferLegSides.[].transferLegId')
-        ).toEqual(['leg-1', 'leg-2'])
     })
 
     it('falls back for a V1 AllocationFactory_Allocate on the same template', () => {
