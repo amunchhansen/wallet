@@ -761,7 +761,16 @@ function renderFieldValue(field: DescribedField) {
             >Cannot display: ${field.error}</span
         >`
     }
-    return field.value === undefined
-        ? nothing
-        : renderValue(field.value, field.format)
+    if (field.value === undefined) {
+        return nothing
+    }
+    // The ledger leaves trailing None fields out of a record, so a missing field is shown as None.
+    // A mistyped descriptor path looks the same, so the user is told the value was inferred.
+    if (field.absent) {
+        return html`${renderValue(field.value, field.format)}
+            <span class="small text-warning-emphasis"
+                >(not in the transaction)</span
+            >`
+    }
+    return renderValue(field.value, field.format)
 }

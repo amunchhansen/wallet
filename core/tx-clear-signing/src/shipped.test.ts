@@ -69,7 +69,7 @@ describe('shippedDescriptors', () => {
         expect(byEntity.get('Bong')).toEqual(['AbortBong', 'Ack'])
     })
 
-    it('describes only AllocationFactory_Allocate on the external party amulet rules', () => {
+    it('describes transfers and allocations on the external party amulet rules', () => {
         const descriptor = shippedDescriptors().find(
             (d) => d.context.template.entityName === 'ExternalPartyAmuletRules'
         )
@@ -81,6 +81,7 @@ describe('shippedDescriptors', () => {
             entityName: 'ExternalPartyAmuletRules',
         })
         expect(Object.keys(descriptor?.display.exercises ?? {})).toEqual([
+            'TransferFactory_Transfer',
             'AllocationFactory_Allocate',
         ])
     })

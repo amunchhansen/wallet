@@ -1,0 +1,108 @@
+{
+    "$schema": "https://example.org/canton-clear-signing/v1/schema.json",
+    "context": {
+        "template": {
+            "packageId": "c5203dee918350373a993328e345872113bd5f8c8f0f51967014d813e583ae66",
+            "moduleName": "Splice.GovernanceLock.Substitution",
+            "entityName": "GovernanceLockSubstitution"
+        }
+    },
+    "metadata": {
+        "version": "1.0.0",
+        "publisher": "<splice publisher>",
+        "name": "Governance lock substitution"
+    },
+    "display": {
+        "create": {
+            "intent": "Propose a governance lock substitution",
+            "interpolatedIntent": "Propose substituting {amount} of the governance lock of {target.owner}, proposed by {owner}",
+            "fields": [
+                {
+                    "path": "amount",
+                    "label": "Amount",
+                    "format": "number"
+                },
+                {
+                    "path": "target.owner",
+                    "label": "Lock owner",
+                    "format": "party"
+                },
+                {
+                    "path": "owner",
+                    "label": "Proposed by",
+                    "format": "party"
+                },
+                {
+                    "path": "target.specification",
+                    "label": "Lock",
+                    "format": "raw"
+                },
+                {
+                    "path": "target.specification.GLS_VestingLock.kind.GLK_FeaturedApp.provider",
+                    "label": "Featured app provider",
+                    "format": "party"
+                },
+                {
+                    "path": "target.specification.GLS_VestingLock.vestingPeriod",
+                    "label": "Vesting period",
+                    "format": "duration"
+                },
+                {
+                    "path": "target.specification.GLS_VestingLock.endTime",
+                    "label": "Vesting ends",
+                    "format": "dateTime"
+                },
+                {
+                    "path": "target.specification.GLS_FullLock.kind.GLK_SuperValidatorRightsOwner.svName",
+                    "label": "SV",
+                    "format": "string"
+                },
+                {
+                    "path": "lockedAmulet",
+                    "label": "Funding",
+                    "format": "contractId"
+                },
+                {
+                    "path": "expiresAt",
+                    "label": "Expires",
+                    "format": "dateTime"
+                },
+                {
+                    "path": "originalSubstitutionCid",
+                    "label": "First proposal",
+                    "format": "contractId"
+                }
+            ]
+        },
+        "exercises": {
+            "TransferInstruction_Accept": {
+                "intent": "Accept a governance lock substitution",
+                "interpolatedIntent": "Accept the substitution of {@.contract.amount} of the governance lock of {@.contract.target.owner}, proposed by {@.contract.owner}",
+                "fields": [
+                    {
+                        "path": "actors",
+                        "label": "Actors",
+                        "format": "raw"
+                    },
+                    {
+                        "path": "extraArgs.context.values",
+                        "label": "Context",
+                        "format": "raw"
+                    }
+                ]
+            },
+            "TransferInstruction_Reject": {
+                "intent": "Reject a governance lock substitution",
+                "interpolatedIntent": "Reject the substitution of {@.contract.amount} proposed by {@.contract.owner}",
+                "fields": [
+                    {
+                        "path": "actors",
+                        "label": "Actors",
+                        "format": "raw"
+                    }
+                ]
+            }
+        }
+    },
+    "signatures": []
+}

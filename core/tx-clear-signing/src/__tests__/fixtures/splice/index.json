@@ -1,0 +1,90 @@
+[
+    {
+        "id": "gl-substitution-create-fa-vesting",
+        "about": "GovernanceLockSubstitution proposed by bob for an FA vesting lock of alice"
+    },
+    {
+        "id": "gl-substitution-create-sv-full",
+        "about": "GovernanceLockSubstitution proposed by the owner of an SV full lock"
+    },
+    {
+        "id": "gl-lock-create",
+        "about": "GovernanceLock: provisional FA full lock that replaces an earlier lock"
+    },
+    {
+        "id": "gl-transfer-create",
+        "about": "GovernanceLockTransfer of an FA vesting lock from alice to bob"
+    },
+    {
+        "id": "vote-request-create",
+        "about": "VoteRequest with two votes, keyed by SV name in a GenMap"
+    },
+    {
+        "id": "transfer-offer-create",
+        "about": "TransferOffer of 12.5 USD from alice to bob"
+    },
+    {
+        "id": "featured-app-right-create",
+        "about": "FeaturedAppRight with all optional config set"
+    },
+    {
+        "id": "otc-trade-proposal-create",
+        "about": "OTCTradeProposal with two transfer legs in a TextMap"
+    },
+    {
+        "id": "balance-update-create-transfer",
+        "about": "Splitwell BalanceUpdate recording a transfer"
+    },
+    {
+        "id": "balance-update-create-netting",
+        "about": "Splitwell BalanceUpdate recording a netting, a nested GenMap"
+    },
+    {
+        "id": "external-party-amulet-rules-create",
+        "about": "ExternalPartyAmuletRules, the input contract of the simulated factory calls"
+    },
+    {
+        "id": "transfer-preapproval-create",
+        "about": "TransferPreapproval, the input contract of the simulated SendV2"
+    },
+    {
+        "id": "wallet-user-proxy-create",
+        "about": "WalletUserProxy, the input contract of the simulated proxied transfer"
+    },
+    {
+        "id": "dso-request-vote-set-config",
+        "about": "DsoRules_RequestVote for SRARC_SetConfig (two DsoRulesConfig trees)"
+    },
+    {
+        "id": "dso-request-vote-amulet-schedule",
+        "about": "DsoRules_RequestVote for CRARC_AddFutureAmuletConfigSchedule, a (Time, AmuletConfig) tuple"
+    },
+    {
+        "id": "dso-set-synchronizer-node-config",
+        "about": "DsoRules_SetSynchronizerNodeConfig with every optional node config set"
+    },
+    {
+        "id": "transfer-offer-accept",
+        "about": "TransferOffer_Accept, a choice with no arguments"
+    },
+    {
+        "id": "activity-marker-v1",
+        "about": "FeaturedAppRight_CreateActivityMarker through FeaturedAppRightV1"
+    },
+    {
+        "id": "activity-marker-v2",
+        "about": "FeaturedAppRight_CreateActivityMarker through FeaturedAppRightV2, with a weight"
+    },
+    {
+        "id": "otc-trade-proposal-accept",
+        "about": "OTCTradeProposal_Accept by the second trader"
+    },
+    {
+        "id": "batching-utility-execute",
+        "about": "BatchingUtility_ExecuteBatch rejecting two governance lock transfers, V1 and V2"
+    },
+    {
+        "id": "gl-transfer-reject-v1",
+        "about": "TransferInstruction_Reject V1 on a GovernanceLockTransfer, through the interface"
+    }
+]

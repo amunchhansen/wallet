@@ -1,0 +1,59 @@
+{
+    "$schema": "https://example.org/canton-clear-signing/v1/schema.json",
+    "context": {
+        "template": {
+            "packageId": "4c380e09c99b2c5cb938f6cce2a92c03f8941ca6f7af7df7c7370b2d421346da",
+            "moduleName": "Splice.Splitwell",
+            "entityName": "BalanceUpdate"
+        }
+    },
+    "metadata": {
+        "version": "1.0.0",
+        "publisher": "<splice publisher>",
+        "name": "Splitwell balance update"
+    },
+    "display": {
+        "create": {
+            "intent": "Record a Splitwell balance update",
+            "interpolatedIntent": "Record a balance update in group {group.id.unpack} of {group.owner}",
+            "fields": [
+                {
+                    "path": "group.id.unpack",
+                    "label": "Group",
+                    "format": "string"
+                },
+                {
+                    "path": "group.owner",
+                    "label": "Owner",
+                    "format": "party"
+                },
+                {
+                    "path": "group.members",
+                    "label": "Members",
+                    "format": "raw"
+                },
+                {
+                    "path": "update",
+                    "label": "Update",
+                    "format": "raw"
+                },
+                {
+                    "path": "update.Transfer.amount",
+                    "label": "Transferred",
+                    "format": "number"
+                },
+                {
+                    "path": "update.Transfer.sender",
+                    "label": "Sender",
+                    "format": "party"
+                },
+                {
+                    "path": "update.Netting.balanceChanges",
+                    "label": "Balance changes",
+                    "format": "raw"
+                }
+            ]
+        }
+    },
+    "signatures": []
+}

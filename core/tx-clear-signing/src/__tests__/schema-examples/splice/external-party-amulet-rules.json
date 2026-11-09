@@ -1,0 +1,123 @@
+{
+    "$schema": "https://example.org/canton-clear-signing/v1/schema.json",
+    "context": {
+        "template": {
+            "packageId": "c5203dee918350373a993328e345872113bd5f8c8f0f51967014d813e583ae66",
+            "moduleName": "Splice.ExternalPartyAmuletRules",
+            "entityName": "ExternalPartyAmuletRules"
+        }
+    },
+    "metadata": {
+        "version": "1.0.0",
+        "publisher": "<splice publisher>",
+        "name": "Amulet rules for external parties"
+    },
+    "display": {
+        "create": {
+            "intent": "Amulet rules for external parties",
+            "interpolatedIntent": "Amulet rules for external parties, administered by {dso}",
+            "fields": [
+                {
+                    "path": "dso",
+                    "label": "Administrator",
+                    "format": "party"
+                }
+            ]
+        },
+        "exercises": {
+            "TransferFactory_Transfer": {
+                "intent": "Request a transfer",
+                "interpolatedIntent": "Request a transfer of {transfer.amount} {transfer.instrumentId.id}. What the receiver does with it depends on the transfer's metadata",
+                "fields": [
+                    {
+                        "path": "transfer.amount",
+                        "label": "Requested amount",
+                        "format": "number"
+                    },
+                    {
+                        "path": "transfer.instrumentId.id",
+                        "label": "Instrument",
+                        "format": "string"
+                    },
+                    {
+                        "path": "transfer.sender",
+                        "label": "From",
+                        "format": "party"
+                    },
+                    {
+                        "path": "transfer.receiver",
+                        "label": "To",
+                        "format": "party"
+                    },
+                    {
+                        "path": "transfer.sender.owner",
+                        "label": "From account owner",
+                        "format": "party"
+                    },
+                    {
+                        "path": "transfer.receiver.owner",
+                        "label": "To account owner",
+                        "format": "party"
+                    },
+                    {
+                        "path": "transfer.meta.values",
+                        "label": "Metadata, which the receiver may act on",
+                        "format": "raw"
+                    },
+                    {
+                        "path": "transfer.executeBefore",
+                        "label": "Execute before",
+                        "format": "dateTime"
+                    }
+                ]
+            },
+            "AllocationFactory_Allocate": {
+                "intent": "Allocate funds for a settlement",
+                "interpolatedIntent": "Allocate funds at {@.contract.dso} for settlement {settlement.id} of {allocation.transferLegSides.length} transfer legs, authorized by {allocation.authorizer.owner}",
+                "fields": [
+                    {
+                        "path": "settlement.id",
+                        "label": "Settlement",
+                        "format": "string"
+                    },
+                    {
+                        "path": "allocation.transferLegSides.length",
+                        "label": "Number of legs",
+                        "format": "number"
+                    },
+                    {
+                        "path": "allocation.authorizer.owner",
+                        "label": "Authorizer",
+                        "format": "party"
+                    },
+                    {
+                        "path": "allocation.transferLegSides",
+                        "label": "Legs",
+                        "format": "raw"
+                    },
+                    {
+                        "path": "allocation.settlement.settlementRef.id",
+                        "label": "Settlement (V1)",
+                        "format": "string"
+                    },
+                    {
+                        "path": "allocation.transferLeg.amount",
+                        "label": "Amount (V1)",
+                        "format": "number"
+                    },
+                    {
+                        "path": "allocation.transferLeg.sender",
+                        "label": "Sender (V1)",
+                        "format": "party"
+                    },
+                    {
+                        "path": "allocation.transferLeg.receiver",
+                        "label": "Receiver (V1)",
+                        "format": "party"
+                    }
+                ]
+            }
+        }
+    },
+    "signatures": []
+}

@@ -57,19 +57,21 @@ describe('resolvePath', () => {
     })
 
     it('returns a None that the path names, and unwraps Some', () => {
-        expect(resolvePath(record('x', some(none)), parsePath('x'))).toEqual(
-            none
-        )
-        expect(resolvePath(record('x', some(int(1))), parsePath('x'))).toEqual(
-            int(1)
-        )
+        expect(
+            resolvePath(record('x', some(none)), parsePath('x')).value
+        ).toEqual(none)
+        expect(
+            resolvePath(record('x', some(int(1))), parsePath('x')).value
+        ).toEqual(int(1))
     })
 
     it('returns a list as a whole', () => {
         const list: Value = {
             sum: { oneofKind: 'list', list: { elements: [int(1)] } },
         }
-        expect(resolvePath(record('xs', list), parsePath('xs'))).toEqual(list)
+        expect(resolvePath(record('xs', list), parsePath('xs')).value).toEqual(
+            list
+        )
     })
 
     it('does not count a GenMap', () => {
@@ -83,8 +85,22 @@ describe('resolvePath', () => {
 
     it('selects a record field named length', () => {
         expect(
-            resolvePath(record('length', int(7)), parsePath('length'))
+            resolvePath(record('length', int(7)), parsePath('length')).value
         ).toEqual(int(7))
+    })
+
+    it('takes a field missing from a record to be None, and says so', () => {
+        expect(resolvePath(record('x', int(1)), parsePath('y'))).toEqual({
+            value: none,
+            absentField: 'y',
+        })
+        expect(resolvePath(record('x', int(1)), parsePath('y.z'))).toEqual({
+            value: none,
+            absentField: 'y',
+        })
+        expect(resolvePath(record('x', int(1)), parsePath('x'))).toEqual({
+            value: int(1),
+        })
     })
 
     it('only counts on the last step', () => {

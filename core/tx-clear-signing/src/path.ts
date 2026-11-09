@@ -58,20 +58,45 @@ function quotedKeyEnd(s: string, start: number): number {
     throw new PathError(`unterminated map key in '${s}'`)
 }
 
+export interface Resolved {
+    value: Value
+    /**
+     * Set when a record has no field labelled as the path names. The ledger leaves trailing `None`
+     * fields out of a record, and upgrades only append optional fields, so such a field is taken to
+     * be `None`. A mistyped path looks the same, so the caller shows that the value was inferred.
+     */
+    absentField?: string
+}
+
+const NONE: Value = { sum: { oneofKind: 'optional', optional: {} } }
+
 /**
  * Resolves the steps of a path against a Daml value. A name step selects a record field by label or
  * the payload of a variant with that constructor. `Some` is unwrapped. A `None` cannot be stepped
- * into, but is returned when it is the value the path names. A final `length` step on a list or text
- * map yields its number of elements as an int64.
+ * into, but is returned when it is the value the path names. A record field that is not in the
+ * record resolves the whole path to `None`, with `absentField` set. A final `length` step on a list
+ * or text map yields its number of elements as an int64.
  *
  * @throws PathError when a step does not resolve
  */
-export function resolvePath(root: Value, steps: Step[]): Value {
+export function resolvePath(root: Value, steps: Step[]): Resolved {
     let current = root
-    steps.forEach((step, i) => {
-        current = applyStep(unwrapSome(current), step, i === steps.length - 1)
-    })
-    return unwrapSome(current)
+    for (const [i, step] of steps.entries()) {
+        const v = unwrapSome(current)
+        const missing = step.kind === 'name' && lacksField(v, step.name)
+        if (missing) {
+            return { value: NONE, absentField: step.name }
+        }
+        current = applyStep(v, step, i === steps.length - 1)
+    }
+    return { value: unwrapSome(current) }
+}
+
+function lacksField(v: Value, name: string): boolean {
+    return (
+        v.sum.oneofKind === 'record' &&
+        !v.sum.record.fields.some((f) => f.label === name)
+    )
 }
 
 export function isNone(v: Value): boolean {
@@ -105,11 +130,9 @@ function selectName(v: Value, name: string, isLast: boolean): Value {
     const sum = v.sum
     switch (sum.oneofKind) {
         case 'record': {
+            // resolvePath handles a missing field before it gets here
             const field = sum.record.fields.find((f) => f.label === name)
-            if (!field) {
-                throw new PathError(`no record field '${name}'`)
-            }
-            return present(field.value)
+            return present(field?.value)
         }
         case 'variant':
             if (sum.variant.constructor !== name) {

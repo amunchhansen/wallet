@@ -1,0 +1,186 @@
+{
+    "$schema": "https://example.org/canton-clear-signing/v1/schema.json",
+    "context": {
+        "template": {
+            "packageId": "0ff9141699e5eb734de1e1a8d11f97233ffd3892d1108872600cb3019fd4a86e",
+            "moduleName": "Splice.DsoRules",
+            "entityName": "DsoRules"
+        }
+    },
+    "metadata": {
+        "version": "1.0.0",
+        "publisher": "<splice publisher>",
+        "name": "DSO rules",
+        "enums": {
+            "rewardVersion": {
+                "RewardVersion_FeaturedAppMarkers": "Featured app markers",
+                "RewardVersion_TrafficBasedAppRewards": "Traffic-based app rewards"
+            }
+        }
+    },
+    "display": {
+        "exercises": {
+            "DsoRules_RequestVote": {
+                "intent": "Request a DSO vote",
+                "interpolatedIntent": "Request a vote by {requester}: {reason.body}",
+                "fields": [
+                    {
+                        "path": "requester",
+                        "label": "Requester",
+                        "format": "party"
+                    },
+                    {
+                        "path": "reason.body",
+                        "label": "Reason",
+                        "format": "string"
+                    },
+                    {
+                        "path": "reason.url",
+                        "label": "Reason URL",
+                        "format": "string"
+                    },
+                    {
+                        "path": "voteRequestTimeout",
+                        "label": "Voting period",
+                        "format": "duration"
+                    },
+                    {
+                        "path": "targetEffectiveAt",
+                        "label": "Effective at",
+                        "format": "dateTime"
+                    },
+                    {
+                        "path": "action",
+                        "label": "Action",
+                        "format": "raw"
+                    },
+                    {
+                        "path": "action.ARC_DsoRules.dsoAction.SRARC_SetConfig.newConfig.maxTextLength",
+                        "label": "New max text length",
+                        "format": "number"
+                    },
+                    {
+                        "path": "action.ARC_DsoRules.dsoAction.SRARC_SetConfig.baseConfig.maxTextLength",
+                        "label": "Current max text length",
+                        "format": "number"
+                    },
+                    {
+                        "path": "action.ARC_DsoRules.dsoAction.SRARC_SetConfig.newConfig.voteCooldownTime",
+                        "label": "New vote cooldown",
+                        "format": "duration"
+                    },
+                    {
+                        "path": "action.ARC_DsoRules.dsoAction.SRARC_SetConfig.newConfig.svOperationsSwitchOverTimes[\"cip-0104\"]",
+                        "label": "CIP-0104 switch-over",
+                        "format": "dateTime"
+                    },
+                    {
+                        "path": "action.ARC_DsoRules.dsoAction.SRARC_SetConfig.newConfig.decentralizedSynchronizer.synchronizers",
+                        "label": "Synchronizers",
+                        "format": "raw"
+                    },
+                    {
+                        "path": "action.ARC_AmuletRules.amuletRulesAction.CRARC_AddFutureAmuletConfigSchedule.newScheduleItem._1",
+                        "label": "Schedule from",
+                        "format": "dateTime"
+                    },
+                    {
+                        "path": "action.ARC_AmuletRules.amuletRulesAction.CRARC_AddFutureAmuletConfigSchedule.newScheduleItem._2.decentralizedSynchronizer.fees.extraTrafficPrice",
+                        "label": "Extra traffic price",
+                        "format": "number"
+                    },
+                    {
+                        "path": "action.ARC_AmuletRules.amuletRulesAction.CRARC_AddFutureAmuletConfigSchedule.newScheduleItem._2.decentralizedSynchronizer.fees.baseRateTrafficLimits.burstWindow",
+                        "label": "Burst window",
+                        "format": "duration"
+                    },
+                    {
+                        "path": "action.ARC_AmuletRules.amuletRulesAction.CRARC_AddFutureAmuletConfigSchedule.newScheduleItem._2.decentralizedSynchronizer.requiredSynchronizers",
+                        "label": "Required synchronizers",
+                        "format": "raw"
+                    },
+                    {
+                        "path": "action.ARC_AmuletRules.amuletRulesAction.CRARC_AddFutureAmuletConfigSchedule.newScheduleItem._2.transferConfig.transferFee.steps",
+                        "label": "Transfer fee steps",
+                        "format": "raw"
+                    },
+                    {
+                        "path": "action.ARC_AmuletRules.amuletRulesAction.CRARC_AddFutureAmuletConfigSchedule.newScheduleItem._2.rewardConfig.mintingVersion",
+                        "label": "Minting",
+                        "format": "enum",
+                        "params": {
+                            "$ref": "$.metadata.enums.rewardVersion"
+                        }
+                    },
+                    {
+                        "path": "action.ARC_AmuletRules.amuletRulesAction.CRARC_AddFutureAmuletConfigSchedule.newScheduleItem._2.rewardConfig.dsoAppActivityWeight",
+                        "label": "DSO app activity weight",
+                        "format": "number"
+                    }
+                ]
+            },
+            "DsoRules_SetSynchronizerNodeConfig": {
+                "intent": "Update the synchronizer node configuration of an SV",
+                "interpolatedIntent": "Set the node configuration of {sv} on {synchronizerId}",
+                "fields": [
+                    {
+                        "path": "sv",
+                        "label": "SV",
+                        "format": "party"
+                    },
+                    {
+                        "path": "synchronizerId",
+                        "label": "Synchronizer",
+                        "format": "string"
+                    },
+                    {
+                        "path": "newNodeConfig.sequencer.url",
+                        "label": "Sequencer URL",
+                        "format": "string"
+                    },
+                    {
+                        "path": "newNodeConfig.sequencer.migrationId",
+                        "label": "Sequencer migration",
+                        "format": "number"
+                    },
+                    {
+                        "path": "newNodeConfig.legacySequencerConfig.url",
+                        "label": "Legacy sequencer URL",
+                        "format": "string"
+                    },
+                    {
+                        "path": "newNodeConfig.legacySequencerConfig.migrationId",
+                        "label": "Legacy sequencer migration",
+                        "format": "number"
+                    },
+                    {
+                        "path": "newNodeConfig.sequencerIdentity.availableAfter",
+                        "label": "Sequencer identity available after",
+                        "format": "dateTime"
+                    },
+                    {
+                        "path": "newNodeConfig.cometBft.governanceKeys.length",
+                        "label": "Governance keys",
+                        "format": "number"
+                    },
+                    {
+                        "path": "newNodeConfig.cometBft.nodes",
+                        "label": "CometBFT nodes",
+                        "format": "raw"
+                    },
+                    {
+                        "path": "newNodeConfig.physicalSynchronizers",
+                        "label": "Physical synchronizers",
+                        "format": "raw"
+                    },
+                    {
+                        "path": "nodeStateCid",
+                        "label": "Node state",
+                        "format": "contractId"
+                    }
+                ]
+            }
+        }
+    },
+    "signatures": []
+}

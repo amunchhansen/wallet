@@ -8,7 +8,13 @@ import type {
 import type { Descriptor, Field, Format, Operation } from './descriptor.js'
 import { formatValue, type EnumTables } from './format.js'
 import { CONTRACT_PREFIX, parseIntent } from './intent.js'
-import { isNone, parsePath, PathError, resolvePath } from './path.js'
+import {
+    isNone,
+    parsePath,
+    PathError,
+    resolvePath,
+    type Resolved,
+} from './path.js'
 import {
     contractArgument,
     decode,
@@ -27,6 +33,12 @@ export interface DescribedField {
     error?: string
     /** The descriptor field's format, when it declares one. The wallet quotes `string` values. */
     format?: Format
+    /**
+     * True when the value is `None` because the field is not in the transaction. The ledger leaves
+     * trailing `None` fields out, so this is usually an unset optional; it is also what a mistyped
+     * path looks like, so the wallet shows that the value was inferred.
+     */
+    absent?: true
 }
 
 /**
@@ -249,12 +261,13 @@ function describeField(
 ): DescribedField {
     const label = field.label ?? field.path
     try {
-        const resolved = resolveField(field, argument)
+        const { value, absentField } = resolveField(field, argument)
         return {
             label,
             path: field.path,
-            value: format(resolved, field, enums),
+            value: format(value, field, enums),
             ...declaredFormat(field),
+            ...(absentField !== undefined && { absent: true }),
         }
     } catch (err) {
         return {
@@ -272,7 +285,7 @@ function valuePart(path: string, selected: Selected): IntentPart {
     const argument = path.startsWith(CONTRACT_PREFIX)
         ? selected.contract
         : selected.argument
-    const resolved = resolveField(field, argument)
+    const { value: resolved } = resolveField(field, argument)
     if (isNone(resolved)) {
         throw new PathError(`'${path}' is None`)
     }
@@ -303,7 +316,7 @@ function declaredFormat(field: Field): { format: Format } | undefined {
     return field.format === undefined ? undefined : { format: field.format }
 }
 
-function resolveField(field: Field, argument: Value | undefined): Value {
+function resolveField(field: Field, argument: Value | undefined): Resolved {
     if (!argument) {
         throw new PathError(`'${field.path}' has no value to start from`)
     }

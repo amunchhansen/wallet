@@ -1,0 +1,69 @@
+{
+    "$schema": "https://example.org/canton-clear-signing/v1/schema.json",
+    "context": {
+        "template": {
+            "packageId": "c5203dee918350373a993328e345872113bd5f8c8f0f51967014d813e583ae66",
+            "moduleName": "Splice.GovernanceLock",
+            "entityName": "GovernanceLock"
+        }
+    },
+    "metadata": {
+        "version": "1.0.0",
+        "publisher": "<splice publisher>",
+        "name": "Governance lock"
+    },
+    "display": {
+        "create": {
+            "intent": "Create a governance lock",
+            "interpolatedIntent": "Lock {amount} of {owner}",
+            "fields": [
+                {
+                    "path": "amount",
+                    "label": "Amount",
+                    "format": "number"
+                },
+                {
+                    "path": "owner",
+                    "label": "Owner",
+                    "format": "party"
+                },
+                {
+                    "path": "dso",
+                    "label": "DSO",
+                    "format": "party"
+                },
+                {
+                    "path": "specification",
+                    "label": "Lock",
+                    "format": "raw"
+                },
+                {
+                    "path": "specification.GLS_FullLock.kind",
+                    "label": "Lock kind",
+                    "format": "raw"
+                },
+                {
+                    "path": "specification.GLS_FullLock.kind.GLK_ProvisionalFeaturedApp.provider",
+                    "label": "Provisional featured app",
+                    "format": "party"
+                },
+                {
+                    "path": "lockedAmulet",
+                    "label": "Locked amulet",
+                    "format": "contractId"
+                },
+                {
+                    "path": "originalLockCid",
+                    "label": "Replaces",
+                    "format": "contractId"
+                },
+                {
+                    "path": "requestedAt",
+                    "label": "Requested",
+                    "format": "dateTime"
+                }
+            ]
+        }
+    },
+    "signatures": []
+}
