@@ -86,12 +86,13 @@ export function templateKey(t: TemplateRef): string {
 }
 
 /**
- * The create argument of the contract an exercise acts on: an input contract, or one created by a node
- * of the same transaction. It must be of the exercised template's package name, module and entity. Its
- * package ID may differ, because an upgrade keeps the package name and changes the package ID.
+ * The create argument of the contract a root exercise acts on. A root exercise can only act on an input
+ * contract, since no earlier node of the transaction can have created it. The contract must be of the
+ * exercised template's package name, module and entity. Its package ID may differ, because an upgrade
+ * keeps the package name and changes the package ID.
  *
- * @returns undefined when the transaction does not carry the contract
- * @throws TransactionShapeError when the contract ID occurs more than once, or names another template
+ * @throws TransactionShapeError when the contract is not an input contract, occurs more than once, or
+ * names another template
  */
 export function contractArgument(
     tx: PreparedTransaction,
@@ -107,24 +108,17 @@ export function contractArgument(
             found.push(contract.v1)
         }
     }
-    for (const node of tx.transaction?.nodes ?? []) {
-        const versioned = node.versionedNode
-        if (versioned.oneofKind !== 'v1') continue
-        const nodeType = versioned.v1.nodeType
-        if (
-            nodeType.oneofKind === 'create' &&
-            nodeType.create.contractId === exercise.contractId
-        ) {
-            found.push(nodeType.create)
-        }
-    }
     if (found.length > 1) {
         throw new TransactionShapeError(
             `contract '${exercise.contractId}' occurs ${found.length} times`
         )
     }
     const create = found[0]
-    if (!create) return undefined
+    if (!create) {
+        throw new TransactionShapeError(
+            `contract '${exercise.contractId}' is not an input contract`
+        )
+    }
     const actual = qualifiedName(create.packageName, create.templateId)
     const expected = qualifiedName(exercise.packageName, exercise.templateId)
     if (actual !== expected) {

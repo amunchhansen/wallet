@@ -5,7 +5,7 @@ import type {
     PreparedTransaction,
     Value,
 } from '@canton-network/core-ledger-proto'
-import type { Descriptor, Field, Operation } from './descriptor.js'
+import type { Descriptor, Field, Format, Operation } from './descriptor.js'
 import { formatValue, type EnumTables } from './format.js'
 import { CONTRACT_PREFIX, parseIntent } from './intent.js'
 import { isNone, parsePath, PathError, resolvePath } from './path.js'
@@ -25,6 +25,8 @@ export interface DescribedField {
     /** Absent when the field failed. */
     value?: string
     error?: string
+    /** The descriptor field's format, when it declares one. The wallet quotes `string` values. */
+    format?: Format
 }
 
 /**
@@ -33,7 +35,7 @@ export interface DescribedField {
  */
 export type IntentPart =
     | { kind: 'text'; text: string }
-    | { kind: 'value'; path: string; value: string }
+    | { kind: 'value'; path: string; value: string; format?: Format }
 
 /**
  * Who wrote the descriptor bound to a node's template. Descriptors are unsigned in v1, so this is
@@ -231,11 +233,7 @@ function describeOperation(
             (segment): IntentPart =>
                 segment.kind === 'text'
                     ? segment
-                    : {
-                          kind: 'value',
-                          path: segment.path,
-                          value: renderPlaceholder(segment.path, selected),
-                      }
+                    : valuePart(segment.path, selected)
         )
         return { status: 'described', intent, fields }
     } catch {
@@ -256,16 +254,39 @@ function describeField(
             label,
             path: field.path,
             value: format(resolved, field, enums),
+            ...declaredFormat(field),
         }
     } catch (err) {
-        return { label, path: field.path, error: (err as Error).message }
+        return {
+            label,
+            path: field.path,
+            error: (err as Error).message,
+            ...declaredFormat(field),
+        }
+    }
+}
+
+// A None fails the placeholder, so the sentence never depends on an absent value.
+function valuePart(path: string, selected: Selected): IntentPart {
+    const field = fieldFor(path, selected)
+    const argument = path.startsWith(CONTRACT_PREFIX)
+        ? selected.contract
+        : selected.argument
+    const resolved = resolveField(field, argument)
+    if (isNone(resolved)) {
+        throw new PathError(`'${path}' is None`)
+    }
+    return {
+        kind: 'value',
+        path,
+        value: format(resolved, field, enums(selected)),
+        ...declaredFormat(field),
     }
 }
 
 // A placeholder is formatted like the field with the same path. {@.contract.<path>} is the create
-// field with <path>, resolved against the contract the exercise acts on. A None fails the placeholder,
-// so the sentence never depends on an absent value.
-function renderPlaceholder(path: string, selected: Selected): string {
+// field with <path>, resolved against the contract the exercise acts on.
+function fieldFor(path: string, selected: Selected): Field {
     const readsContract = path.startsWith(CONTRACT_PREFIX)
     const fieldPath = readsContract ? path.slice(CONTRACT_PREFIX.length) : path
     const fields = readsContract
@@ -275,12 +296,11 @@ function renderPlaceholder(path: string, selected: Selected): string {
     if (!field) {
         throw new PathError(`no field '${fieldPath}'`)
     }
-    const argument = readsContract ? selected.contract : selected.argument
-    const resolved = resolveField(field, argument)
-    if (isNone(resolved)) {
-        throw new PathError(`'${path}' is None`)
-    }
-    return format(resolved, field, enums(selected))
+    return field
+}
+
+function declaredFormat(field: Field): { format: Format } | undefined {
+    return field.format === undefined ? undefined : { format: field.format }
 }
 
 function resolveField(field: Field, argument: Value | undefined): Value {

@@ -122,16 +122,46 @@ describe('clearSign', () => {
                     // Values are kept apart from the descriptor's wording.
                     intent: [
                         { kind: 'text', text: 'Ping ' },
-                        { kind: 'value', path: 'id', value: PING_ID },
+                        {
+                            kind: 'value',
+                            path: 'id',
+                            value: PING_ID,
+                            format: 'string',
+                        },
                         { kind: 'text', text: ' from ' },
-                        { kind: 'value', path: 'initiator', value: ALICE },
+                        {
+                            kind: 'value',
+                            path: 'initiator',
+                            value: ALICE,
+                            format: 'party',
+                        },
                         { kind: 'text', text: ' to ' },
-                        { kind: 'value', path: 'responder', value: ALICE },
+                        {
+                            kind: 'value',
+                            path: 'responder',
+                            value: ALICE,
+                            format: 'party',
+                        },
                     ],
                     fields: [
-                        { label: 'Ping ID', path: 'id', value: PING_ID },
-                        { label: 'Initiator', path: 'initiator', value: ALICE },
-                        { label: 'Responder', path: 'responder', value: ALICE },
+                        {
+                            label: 'Ping ID',
+                            path: 'id',
+                            value: PING_ID,
+                            format: 'string',
+                        },
+                        {
+                            label: 'Initiator',
+                            path: 'initiator',
+                            value: ALICE,
+                            format: 'party',
+                        },
+                        {
+                            label: 'Responder',
+                            path: 'responder',
+                            value: ALICE,
+                            format: 'party',
+                        },
                     ],
                 },
             ],
@@ -225,20 +255,11 @@ describe('clearSign', () => {
 
     it('rejects a contract id that occurs twice', () => {
         const tx = exercisePing()
-        const input = tx.metadata?.inputContracts[0]?.contract
-        const nodes = tx.transaction?.nodes
-        if (input?.oneofKind !== 'v1' || !nodes) {
+        const input = tx.metadata?.inputContracts[0]
+        if (input?.contract.oneofKind !== 'v1') {
             throw new Error('fixture has no input contract')
         }
-        nodes.push({
-            nodeId: '1',
-            versionedNode: {
-                oneofKind: 'v1',
-                v1: {
-                    nodeType: { oneofKind: 'create', create: input.v1 },
-                },
-            },
-        })
+        tx.metadata?.inputContracts.push(input)
         expect(() => clearSign(encode(tx), [ping])).toThrow(/occurs 2 times/)
     })
 
@@ -295,7 +316,21 @@ describe('clearSign', () => {
         expect(clearSign(encode(tx), [ping]).complete).toBe(true)
     })
 
-    it('describes every root, finding a contract created in the same transaction', () => {
+    it('rejects an exercise on a contract that is not an input contract', () => {
+        const tx = exercisePing()
+        if (!tx.metadata) {
+            throw new Error('fixture has no metadata')
+        }
+        tx.metadata.inputContracts = []
+        expect(() => clearSign(encode(tx), [ping])).toThrow(
+            TransactionShapeError
+        )
+        expect(() => clearSign(encode(tx), [ping])).toThrow(
+            /is not an input contract/
+        )
+    })
+
+    it('rejects an exercise on a contract created by an earlier root', () => {
         const plain = vectorDescriptor('Plain', {
             create: {
                 intent: 'Create a plain contract',
@@ -310,12 +345,27 @@ describe('clearSign', () => {
                 },
             },
         })
+        expect(() =>
+            clearSign(createAndExercise.preparedTransaction, [plain])
+        ).toThrow(/is not an input contract/)
+    })
+
+    it('describes a create and an exercise of an undescribed template without reading the contract', () => {
+        const plain = vectorDescriptor('Plain', {
+            create: {
+                intent: 'Create a plain contract',
+                interpolatedIntent: 'Create a plain contract for {owner}',
+                fields: [{ path: 'owner', format: 'party' }],
+            },
+        })
         const result = clearSign(createAndExercise.preparedTransaction, [plain])
-        expect(result.complete).toBe(true)
-        expect(result.operations.map(intentText)).toEqual([
-            `Create a plain contract for ${OWNER}`,
-            `Check the contract of ${OWNER}`,
+        expect(result.operations.map((o) => o.status)).toEqual([
+            'described',
+            'undescribed',
         ])
+        expect(intentText(result.operations[0]!)).toBe(
+            `Create a plain contract for ${OWNER}`
+        )
     })
 
     it('describes only the root of a nested transaction', () => {

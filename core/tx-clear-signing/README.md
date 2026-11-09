@@ -42,7 +42,9 @@ const { complete, operations } = clearSign(preparedTransaction, [
 
 Only root nodes are described. A child node is a consequence of its root's choice, which the root's descriptor words. This is a deliberate narrowing of the design, which traverses nested operations too. Every root is shown, described or not.
 
-The contract read by `{@.contract.…}` may have been created under an earlier package of the same package name (an upgrade). Its package name, module and entity must equal the exercise's. This is the one place where the package ID is not matched exactly.
+A root exercise can only act on an input contract of the transaction, since no earlier node can have created it. If the exercised contract is not an input contract, `clearSign` throws a `TransactionShapeError` and the approve page reports that the transaction cannot be described.
+
+The contract read by `{@.contract.…}` may be an input contract created under an earlier package of the same package name (an upgrade). Its package name, module and entity must equal the exercise's. This is the one place where the package ID is not matched exactly.
 
 ## Identifying the operation
 

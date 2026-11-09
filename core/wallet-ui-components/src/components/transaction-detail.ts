@@ -331,6 +331,7 @@ class WgTransactionDetail extends BaseElement {
                 padding: 0 var(--wg-space-1);
                 border-radius: var(--wg-radius-sm);
                 background: rgba(var(--wg-shade-rgb), 0.08);
+                white-space: pre-wrap;
             }
 
             .operation-origin dd.identifier {
@@ -705,13 +706,19 @@ function typeName({ moduleName, entityName }: TemplateRef): string {
 // What the transaction itself says it does (kind, choice, template), so an operation is identified
 // even when its descriptor words it vaguely or is missing. The descriptor's own claim is kept apart.
 // Values read from the transaction are set apart from the descriptor's wording, so a text value
-// cannot pass as part of the sentence.
+// cannot pass as part of the sentence. A string is quoted, so an empty string is "" and the spaces
+// around it do not collapse into each other.
 function renderIntentPart(part: IntentPart) {
     return part.kind === 'text'
         ? part.text
         : html`<span class="intent-value" title=${part.path}
-              >${part.value}</span
+              >${renderValue(part.value, part.format)}</span
           >`
+}
+
+function renderValue(value: string, format?: DescribedField['format']) {
+    // An empty span does not separate the spaces on either side of it.
+    return format === 'string' || value === '' ? JSON.stringify(value) : value
 }
 
 function renderOperationOrigin(op: OperationDescription) {
@@ -754,5 +761,7 @@ function renderFieldValue(field: DescribedField) {
             >Cannot display: ${field.error}</span
         >`
     }
-    return field.value
+    return field.value === undefined
+        ? nothing
+        : renderValue(field.value, field.format)
 }

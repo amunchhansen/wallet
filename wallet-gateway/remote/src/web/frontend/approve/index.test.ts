@@ -17,6 +17,12 @@ import {
 } from '../__tests__/test-helpers.js'
 import { pingCreate, pingCreateHash } from '../__tests__/ping-transaction.js'
 
+// A fetch root decodes and hashes. clearSign rejects it, because a root has to be a create or an
+// exercise. An empty prepared transaction cannot be hashed, which would also disable approval.
+const fetchRoot =
+    'CtsDCgMyLjESATAa0AMKATDCPskDEsYDCgMyLjESQjAwODM2ZmE0NzAxNmQ4OWJmZWRlNjM5NzlhZDA0OTJkZWI3OGQ5Yzc4MDYzNWNiNDhlMTdhYWE5YjRlNGE2OTczOBoiY2FudG9uLWJ1aWx0aW4tYWRtaW4td29ya2Zsb3ctcGluZyJeCkBkZTJjYzJmOTBlYjUyMzQxNGZmNTRlODk5OTUxZGFkZDg3ODlhNGMwN2UwZjcxZjZkNmM5ZWFmNTdkNDEyYTU0EhRDYW50b24uSW50ZXJuYWwuUGluZxoEUGluZypRdjEtMDEtYWxpY2U6OjEyMjBlZTI2MjQxOTA4MzRkZGRmMjhmMTk0Njg1YWNlZThmMDBjYmRlOWVlMGQyMTFkYWUyNzdmNGQ3OTk4ODRmMjg5MlF2MS0wMS1hbGljZTo6MTIyMGVlMjYyNDE5MDgzNGRkZGYyOGYxOTQ2ODVhY2VlOGYwMGNiZGU5ZWUwZDIxMWRhZTI3N2Y0ZDc5OTg4NGYyODk6UXYxLTAxLWFsaWNlOjoxMjIwZWUyNjI0MTkwODM0ZGRkZjI4ZjE5NDY4NWFjZWU4ZjAwY2JkZTllZTBkMjExZGFlMjc3ZjRkNzk5ODg0ZjI4ORL/ARJ5ClF2MS0wMS1hbGljZTo6MTIyMGVlMjYyNDE5MDgzNGRkZGYyOGYxOTQ2ODVhY2VlOGYwMGNiZGU5ZWUwZDIxMWRhZTI3N2Y0ZDc5OTg4NGYyODkSJDUxMjFkMTIwLTNjNTMtNDEwMy04NmFhLTdhM2VhNjZlYzQ2NRpTZ2xvYmFsLWRvbWFpbjo6MTIyMGI5NTM5MWNkMDNlMTE4NzFkNTRlOTBjMjAyNTc1ZDI5ZTc2YzI2NWRkMzg4YjhhZmIwNWFhZDU0ZDY3MGRmYzYqJDhiOTBhNDQ4LTFmZmEtNDA0OS04NTNlLWY4YjRmZTg1M2RjMjCwqJjB5v+UAw=='
+const fetchRootHash = 'E5qahj0hgHMh/gvQzwrmZpXv4BmXbewRLujEFbabegM='
+
 const {
     mockCreateUserClient,
     showToast,
@@ -40,6 +46,7 @@ vi.mock('../rpc-client.js', () => ({
     createUserClient: mockCreateUserClient,
 }))
 vi.mock('../state-manager.js', () => ({
+    VERSION_PREFIX: 'com.splice.wallet.v1',
     stateManager: {
         accessToken: { get: () => 'test-token' },
         currentOrigin: {
@@ -136,8 +143,8 @@ describe('UserUiApprove', () => {
             mockApproveState()
             el = await fixture<ApproveUi>(componentFixture)
             await waitUntil(
-                () => el.commandId === 'cmd-1',
-                'transaction loaded'
+                () => el.reviewedHash === pingCreateHash,
+                'hash reviewed'
             )
         })
 
@@ -290,15 +297,82 @@ describe('UserUiApprove', () => {
             ).toHaveProperty('disabled', false)
         })
 
+        it('marks an empty value, so it does not vanish from the intent', async () => {
+            mockApproveState(
+                makeTransaction({ preparedTransaction: pingCreate })
+            )
+            el = await fixture<ApproveUi>(componentFixture)
+            await waitUntil(
+                () => el.clearSigning !== null,
+                'transaction described'
+            )
+            const detail = el.shadowRoot?.querySelector(
+                'wg-transaction-detail'
+            ) as
+                | (HTMLElement & {
+                      updateComplete: Promise<unknown>
+                      clearSigning: unknown
+                  })
+                | null
+            const template = el.clearSigning?.operations[0]?.template
+            if (!detail || !template) throw new Error('nothing rendered')
+            detail.clearSigning = {
+                complete: true,
+                operations: [
+                    {
+                        nodeId: '0',
+                        kind: 'create',
+                        template,
+                        status: 'described',
+                        intent: [
+                            { kind: 'text', text: 'Memo ' },
+                            {
+                                kind: 'value',
+                                path: 'memo',
+                                value: '',
+                                format: 'string',
+                            },
+                            { kind: 'text', text: ' was set' },
+                        ],
+                        fields: [
+                            {
+                                label: 'Memo',
+                                path: 'memo',
+                                value: '',
+                                format: 'string',
+                            },
+                        ],
+                    },
+                ],
+            }
+            await detail.updateComplete
+
+            const root = detail.shadowRoot
+            expect(
+                root?.querySelector('.intent .intent-value')?.textContent
+            ).toBe('""')
+            expect(root?.querySelector('.intent')?.textContent).toContain(
+                'Memo "" was set'
+            )
+            expect(
+                root?.querySelector('.operation-fields dd')?.textContent?.trim()
+            ).toBe('""')
+        })
+
         it('shows why a transaction cannot be described', async () => {
             const consoleError = vi
                 .spyOn(console, 'error')
                 .mockImplementation(() => {})
-            mockApproveState()
+            mockApproveState(
+                makeTransaction({
+                    preparedTransaction: fetchRoot,
+                    preparedTransactionHash: fetchRootHash,
+                })
+            )
             el = await fixture<ApproveUi>(componentFixture)
             await waitUntil(
-                () => el.commandId === 'cmd-1',
-                'transaction loaded'
+                () => el.reviewedHash === fetchRootHash,
+                'hash reviewed'
             )
 
             expect(el.clearSigning).toBeNull()
@@ -352,7 +426,10 @@ describe('UserUiApprove', () => {
             history.replaceState({}, '', '?transactionId=tx-1&closeafteraction')
             mockApproveState()
             el = await fixture<ApproveUi>(componentFixture)
-            await vi.waitFor(() => expect(el.commandId).toBe('cmd-1'))
+            await waitUntil(
+                () => el.reviewedHash === pingCreateHash,
+                'hash reviewed'
+            )
         })
 
         it('closes the window after approve when opened from a dApp', async () => {
