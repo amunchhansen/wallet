@@ -6,30 +6,17 @@ import type { Value } from '@canton-network/core-ledger-proto'
 import { parsePath, PathError, resolvePath } from './path.js'
 
 describe('parsePath', () => {
-    it('splits roots and steps', () => {
-        expect(parsePath('@.contract.transfer.amount')).toEqual({
-            root: 'contract',
-            steps: [
-                { kind: 'name', name: 'transfer' },
-                { kind: 'name', name: 'amount' },
-            ],
-        })
-        expect(parsePath('settlement.executors.[]').steps).toEqual([
+    it('splits a path into steps', () => {
+        expect(parsePath('settlement.executors.[]')).toEqual([
             { kind: 'name', name: 'settlement' },
             { kind: 'name', name: 'executors' },
             { kind: 'each' },
         ])
-        expect(parsePath('$.metadata.constants.dso')).toEqual({
-            root: 'descriptor',
-            steps: [{ kind: 'name', name: 'dso' }],
-        })
-        expect(() => parsePath('@.actAs')).toThrow(PathError)
-        expect(() => parsePath('$.context.template')).toThrow(PathError)
     })
 
     it('reads quoted map keys, including escapes and separators', () => {
         expect(
-            parsePath('meta.values["a \\"quoted\\" key with } and ]"]').steps
+            parsePath('meta.values["a \\"quoted\\" key with } and ]"]')
         ).toEqual([
             { kind: 'name', name: 'meta' },
             { kind: 'name', name: 'values' },
@@ -37,32 +24,71 @@ describe('parsePath', () => {
         ])
     })
 
-    it.each(['', '.amount', 'amount.', 'a..b', 'values["open', '1amount'])(
-        'rejects %j',
-        (path) => {
-            expect(() => parsePath(path)).toThrow(PathError)
-        }
-    )
+    it.each([
+        '',
+        '.amount',
+        'amount.',
+        'a..b',
+        'values["open',
+        '1amount',
+        '@.contract.id',
+    ])('rejects %j', (path) => {
+        expect(() => parsePath(path)).toThrow(PathError)
+    })
 })
 
 describe('resolvePath', () => {
     const none: Value = { sum: { oneofKind: 'optional', optional: {} } }
+    const some = (value: Value): Value => ({
+        sum: { oneofKind: 'optional', optional: { value } },
+    })
+    const int = (n: number): Value => ({
+        sum: { oneofKind: 'int64', int64: String(n) },
+    })
     const record = (label: string, value: Value): Value => ({
         sum: { oneofKind: 'record', record: { fields: [{ label, value }] } },
     })
 
-    it('fails on None', () => {
+    it('cannot step into None', () => {
         expect(() =>
-            resolvePath(record('x', none), parsePath('x').steps)
+            resolvePath(record('x', some(none)), parsePath('x.y'))
         ).toThrow('optional value is None')
     })
 
+    it('returns a None that the path names, and unwraps Some', () => {
+        expect(resolvePath(record('x', some(none)), parsePath('x'))).toEqual(
+            none
+        )
+        expect(resolvePath(record('x', some(int(1))), parsePath('x'))).toEqual(
+            int(1)
+        )
+    })
+
+    it('returns a list for a [] path, even with one element', () => {
+        const list: Value = {
+            sum: { oneofKind: 'list', list: { elements: [int(1)] } },
+        }
+        expect(resolvePath(record('xs', list), parsePath('xs.[]'))).toEqual([
+            int(1),
+        ])
+    })
+
+    it('does not step into a GenMap', () => {
+        const genMap: Value = {
+            sum: { oneofKind: 'genMap', genMap: { entries: [] } },
+        }
+        expect(() =>
+            resolvePath(record('m', genMap), parsePath('m.[]'))
+        ).toThrow("'[]' applied to genMap")
+        expect(() =>
+            resolvePath(record('m', genMap), parsePath('m.length'))
+        ).toThrow("'length' applied to genMap")
+    })
+
     it('selects a record field named length', () => {
-        const value: Value = { sum: { oneofKind: 'int64', int64: '7' } }
         expect(
-            resolvePath(record('length', value), parsePath('length').steps)
-                .values
-        ).toEqual([value])
+            resolvePath(record('length', int(7)), parsePath('length'))
+        ).toEqual(int(7))
     })
 
     it('only counts on the last step', () => {
@@ -70,7 +96,7 @@ describe('resolvePath', () => {
             sum: { oneofKind: 'list', list: { elements: [] } },
         }
         expect(() =>
-            resolvePath(record('xs', list), parsePath('xs.length.foo').steps)
+            resolvePath(record('xs', list), parsePath('xs.length.foo'))
         ).toThrow("'length' applied to list")
     })
 })

@@ -10,14 +10,14 @@ import merge from './descriptors/merge.json'
 import ping from './descriptors/ping.json'
 import { parseDescriptor, type Descriptor } from './descriptor.js'
 
-let cached: Descriptor[] | undefined
+let cached: readonly Descriptor[] | undefined
 
 /**
  * The clear-signing descriptors shipped with this build. A prepared transaction is fully described
  * only when every root matches one of these, by package ID, module and entity.
  */
-export function shippedDescriptors(): Descriptor[] {
-    cached ??= [
+export function shippedDescriptors(): readonly Descriptor[] {
+    cached ??= Object.freeze([
         parseDescriptor(ping),
         parseDescriptor(bongProposal),
         parseDescriptor(explode),
@@ -25,6 +25,6 @@ export function shippedDescriptors(): Descriptor[] {
         parseDescriptor(collapse),
         parseDescriptor(bong),
         parseDescriptor(amuletAllocation),
-    ]
+    ])
     return cached
 }

@@ -18,11 +18,7 @@
             "interpolatedIntent": "Ping {id} from {initiator} to {responder}",
             "fields": [
                 { "path": "id", "label": "Ping ID", "format": "string" },
-                {
-                    "path": "initiator",
-                    "label": "Initiator",
-                    "format": "party"
-                },
+                { "path": "initiator", "label": "Initiator", "format": "party" },
                 { "path": "responder", "label": "Responder", "format": "party" }
             ]
         },
@@ -35,11 +31,7 @@
                 "intent": "Abort ping",
                 "interpolatedIntent": "Abort ping {@.contract.id} from {@.contract.initiator}, as {anyone}",
                 "fields": [
-                    {
-                        "path": "anyone",
-                        "label": "Aborted by",
-                        "format": "party"
-                    }
+                    { "path": "anyone", "label": "Aborted by", "format": "party" }
                 ]
             }
         }

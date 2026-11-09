@@ -225,7 +225,10 @@ describe('UserUiApprove', () => {
             )
 
             expect(el.clearSigning?.complete).toBe(true)
-            expect(el.clearSigning?.operations[0]?.intent).toMatch(/^Ping /)
+            expect(el.clearSigning?.operations[0]?.intent[0]).toEqual({
+                kind: 'text',
+                text: 'Ping ',
+            })
             expect(el.clearSigning?.operations[0]).toMatchObject({
                 kind: 'create',
                 template: {
@@ -238,7 +241,12 @@ describe('UserUiApprove', () => {
             })
             const detail = el.shadowRoot?.querySelector(
                 'wg-transaction-detail'
-            ) as (HTMLElement & { updateComplete: Promise<unknown> }) | null
+            ) as
+                | (HTMLElement & {
+                      updateComplete: Promise<unknown>
+                      clearSigning: unknown
+                  })
+                | null
             await el.updateComplete
             await detail?.updateComplete
             expect(detail?.clearSigning).toBe(el.clearSigning)
@@ -250,7 +258,7 @@ describe('UserUiApprove', () => {
             ).toHaveProperty('disabled', false)
         })
 
-        it('shows no description when the transaction cannot be decoded', async () => {
+        it('shows why a transaction cannot be described', async () => {
             const consoleError = vi
                 .spyOn(console, 'error')
                 .mockImplementation(() => {})
@@ -261,12 +269,16 @@ describe('UserUiApprove', () => {
                 'transaction loaded'
             )
 
-            expect(el.clearSigning).toEqual({ complete: false, operations: [] })
+            expect(el.clearSigning).toBeNull()
+            expect(el.clearSigningError).toEqual(expect.any(String))
             const detail = el.shadowRoot?.querySelector(
                 'wg-transaction-detail'
             ) as HTMLElement | null
             await (detail as { updateComplete?: Promise<unknown> } | null)
                 ?.updateComplete
+            expect(
+                detail?.shadowRoot?.querySelector('.alert-danger')?.textContent
+            ).toContain('This transaction could not be described')
             const approve =
                 detail?.shadowRoot?.querySelector('button.btn-primary')
             expect(approve).toHaveProperty('disabled', false)
@@ -689,39 +701,6 @@ describe('UserUiApprove', () => {
             await vi.waitFor(() =>
                 expect(pollCount()).toBeGreaterThan(whileHidden)
             )
-        })
-    })
-
-    describe('demo previews', () => {
-        it('describes the two-leg allocation and does not load a transaction', async () => {
-            history.replaceState({}, '', '?demo=allocation')
-            el = await fixture<ApproveUi>(componentFixture)
-            await waitUntil(
-                () => el.commandId === 'allocation' && el.clearSigning !== null,
-                'allocation preview loaded'
-            )
-
-            expect(el.disabled).toBe(true)
-            expect(el.status).toBe('preview')
-            expect(el.clearSigning?.complete).toBe(true)
-            expect(mockRequest).not.toHaveBeenCalled()
-            expect(
-                el.shadowRoot?.querySelector('.alert-warning')?.textContent
-            ).toContain('not a transaction to sign')
-        })
-
-        it('describes two Ping creates and does not load a transaction', async () => {
-            history.replaceState({}, '', '?demo=two-pings')
-            el = await fixture<ApproveUi>(componentFixture)
-            await waitUntil(
-                () => el.commandId === 'two-pings',
-                'two ping preview loaded'
-            )
-
-            expect(el.disabled).toBe(true)
-            expect(el.clearSigning?.complete).toBe(true)
-            expect(el.clearSigning?.operations).toHaveLength(2)
-            expect(mockRequest).not.toHaveBeenCalled()
         })
     })
 })

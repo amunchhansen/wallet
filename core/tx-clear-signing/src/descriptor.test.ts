@@ -3,41 +3,32 @@
 
 import { describe, expect, it } from 'vitest'
 import { DescriptorError, parseDescriptor } from './descriptor.js'
-import allocation from './descriptors/amulet-allocation-factory-v2.json'
-import ping from './__tests__/descriptors/ping.json'
-import transferOffer from './__tests__/descriptors/utility-transfer-offer.json'
-import badExerciseKey from './__tests__/descriptors/invalid/bad-exercise-key.json'
-import badPackageId from './__tests__/descriptors/invalid/bad-package-id.json'
-import enumWithoutRef from './__tests__/descriptors/invalid/enum-without-ref.json'
-import hashPath from './__tests__/descriptors/invalid/hash-path.json'
-import missingPackageId from './__tests__/descriptors/invalid/missing-package-id.json'
-import operationWithoutIntent from './__tests__/descriptors/invalid/operation-without-intent.json'
-import paramsOnParty from './__tests__/descriptors/invalid/params-on-party.json'
-import unknownFormat from './__tests__/descriptors/invalid/unknown-format.json'
-import unknownTopLevelKey from './__tests__/descriptors/invalid/unknown-top-level-key.json'
+import ping from './__tests__/schema-examples/ping.json'
+
+// The examples of canton-clear-signing-v1.schema.json, copied unchanged from
+// mpa/documentation/clearsigning/examples. The parser must agree with the schema on every one.
+// No type argument: see core/tx-hashing/src/__tests__/helpers/load-vectors.ts.
+const valid = import.meta.glob('./__tests__/schema-examples/*.json', {
+    eager: true,
+    import: 'default',
+}) as Record<string, unknown>
+const invalid = import.meta.glob('./__tests__/schema-examples/invalid/*.json', {
+    eager: true,
+    import: 'default',
+}) as Record<string, unknown>
 
 describe('parseDescriptor', () => {
-    it.each([
-        ['ping', ping],
-        ['utility-transfer-offer', transferOffer],
-        ['amulet-allocation-factory-v2', allocation],
-    ])('accepts %s', (_, json) => {
+    it('has the schema examples', () => {
+        expect(Object.keys(valid).length).toBeGreaterThan(0)
+        expect(Object.keys(invalid).length).toBeGreaterThan(0)
+    })
+
+    it.each(Object.entries(valid))('accepts %s', (_, json) => {
         expect(() => parseDescriptor(json)).not.toThrow()
     })
 
-    it.each([
-        ['bad-exercise-key', badExerciseKey, 'display.exercises'],
-        ['bad-package-id', badPackageId, 'context.template.packageId'],
-        ['enum-without-ref', enumWithoutRef, "format 'enum' requires params"],
-        ['hash-path', hashPath, 'path'],
-        ['missing-package-id', missingPackageId, 'context.template.packageId'],
-        ['operation-without-intent', operationWithoutIntent, 'intent'],
-        ['params-on-party', paramsOnParty, 'params'],
-        ['unknown-format', unknownFormat, 'format'],
-        ['unknown-top-level-key', unknownTopLevelKey, '<root>'],
-    ])('rejects %s', (_, json, problem) => {
+    it.each(Object.entries(invalid))('rejects %s', (_, json) => {
         expect(() => parseDescriptor(json)).toThrow(DescriptorError)
-        expect(() => parseDescriptor(json)).toThrow(problem)
     })
 
     it('rejects an unsupported schema', () => {
@@ -67,47 +58,17 @@ describe('parseDescriptor', () => {
         ).toThrow('display.exercises')
     })
 
-    it('rejects a path that is not an argument, the contract, or a constant', () => {
-        expect(() =>
-            parseDescriptor({
-                ...ping,
-                display: {
-                    create: {
-                        intent: 'Ping',
-                        fields: [{ path: '@.actAs' }],
-                    },
-                },
-            })
-        ).toThrow('path')
-        expect(() =>
-            parseDescriptor({
-                ...ping,
-                display: {
-                    create: {
-                        intent: 'Ping',
-                        fields: [{ path: '$.context.template.packageId' }],
-                    },
-                },
-            })
-        ).toThrow('path')
-    })
-
     it.each([
-        ['is missing', {}],
-        ['is null', { network: null }],
-    ])('rejects a constant that %s', (_, constants) => {
+        '@.actAs',
+        '$.context.template.packageId',
+        '$.metadata.constants.network',
+    ])('rejects a path that is not an argument or the contract: %s', (path) => {
         expect(() =>
             parseDescriptor({
                 ...ping,
-                metadata: { ...ping.metadata, constants },
-                display: {
-                    create: {
-                        intent: 'Ping',
-                        fields: [{ path: '$.metadata.constants.network' }],
-                    },
-                },
+                display: { create: { intent: 'Ping', fields: [{ path }] } },
             })
-        ).toThrow("no constant 'network'")
+        ).toThrow('path')
     })
 
     it.each([
@@ -189,6 +150,16 @@ describe('parseDescriptor', () => {
                 },
             },
             "unmatched '}'",
+        ],
+        [
+            'a path declared twice',
+            {
+                create: {
+                    intent: 'Ping',
+                    fields: [{ path: 'id' }, { path: 'id', format: 'string' }],
+                },
+            },
+            "field 'id' is declared more than once",
         ],
     ])('rejects %s', (_, display, problem) => {
         expect(() => parseDescriptor({ ...ping, display })).toThrow(problem)

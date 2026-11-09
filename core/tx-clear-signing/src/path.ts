@@ -2,25 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Value } from '@canton-network/core-ledger-proto'
-import { CONSTANT_PREFIX, CONTRACT_PREFIX } from './intent.js'
 
 export type Step =
     | { kind: 'name'; name: string }
     | { kind: 'key'; key: string }
     | { kind: 'each' }
-
-export type PathRoot = 'argument' | 'contract' | 'descriptor'
-
-export interface ParsedPath {
-    root: PathRoot
-    steps: Step[]
-}
-
-export interface Resolved {
-    values: Value[]
-    /** True when a `[]` step applied, so the field is a list even with one element. */
-    isList: boolean
-}
 
 export class PathError extends Error {
     constructor(message: string) {
@@ -31,43 +17,35 @@ export class PathError extends Error {
 
 const NAME = /^[A-Za-z_][A-Za-z0-9_]*/
 
-export function parsePath(path: string): ParsedPath {
-    let root: PathRoot = 'argument'
-    let rest = path
-    if (path.startsWith(CONTRACT_PREFIX)) {
-        root = 'contract'
-        rest = path.slice(CONTRACT_PREFIX.length)
-    } else if (path.startsWith(CONSTANT_PREFIX)) {
-        root = 'descriptor'
-        rest = path.slice(CONSTANT_PREFIX.length)
-    } else if (path.startsWith('@.') || path.startsWith('$.')) {
-        throw new PathError(`unsupported path root in '${path}'`)
-    }
-
+/**
+ * Parses a path into its steps. The path starts at the value it is resolved against; `@.contract.`
+ * is stripped by the caller, which also picks that value.
+ */
+export function parsePath(path: string): Step[] {
     const steps: Step[] = []
     let pos = 0
     for (;;) {
-        if (rest.startsWith('[]', pos)) {
+        if (path.startsWith('[]', pos)) {
             steps.push({ kind: 'each' })
             pos += 2
         } else {
-            const name = NAME.exec(rest.slice(pos))?.[0]
+            const name = NAME.exec(path.slice(pos))?.[0]
             if (name === undefined) {
                 throw new PathError(`invalid path '${path}' at offset ${pos}`)
             }
             steps.push({ kind: 'name', name })
             pos += name.length
-            while (rest.startsWith('["', pos)) {
-                const end = quotedKeyEnd(rest, pos + 1)
-                const key: unknown = JSON.parse(rest.slice(pos + 1, end + 1))
+            while (path.startsWith('["', pos)) {
+                const end = quotedKeyEnd(path, pos + 1)
+                const key: unknown = JSON.parse(path.slice(pos + 1, end + 1))
                 steps.push({ kind: 'key', key: String(key) })
                 pos = end + 2
             }
         }
-        if (pos === rest.length) {
-            return { root, steps }
+        if (pos === path.length) {
+            return steps
         }
-        if (rest[pos] !== '.') {
+        if (path[pos] !== '.') {
             throw new PathError(`invalid path '${path}' at offset ${pos}`)
         }
         pos++
@@ -90,25 +68,32 @@ function quotedKeyEnd(s: string, start: number): number {
 
 /**
  * Resolves the steps of a path against a Daml value. A name step selects a record field by label or
- * the payload of a variant with that constructor. `Some` is unwrapped; `None` fails. A final `length`
- * step on a list or map yields its number of elements as an int64.
+ * the payload of a variant with that constructor. `Some` is unwrapped. A `None` cannot be stepped
+ * into, but is returned when it is the value the path names. A final `length` step on a list or text
+ * map yields its number of elements as an int64.
  *
+ * @returns a list when the path contains `[]`, even with one element; otherwise the single value
  * @throws PathError when a step does not resolve
  */
-export function resolvePath(root: Value, steps: Step[]): Resolved {
+export function resolvePath(root: Value, steps: Step[]): Value | Value[] {
     let current: Value[] = [root]
-    let isList = false
     steps.forEach((step, i) => {
         const isLast = i === steps.length - 1
-        if (step.kind === 'each') isList = true
-        current = current.flatMap((v) =>
-            applyStep(unwrapOptional(v), step, isLast)
-        )
+        current = current.flatMap((v) => applyStep(unwrapSome(v), step, isLast))
     })
-    return { values: current.map(unwrapOptional), isList }
+    const values = current.map(unwrapSome)
+    const isList = steps.some((step) => step.kind === 'each')
+    return isList ? values : values[0]!
+}
+
+export function isNone(v: Value): boolean {
+    return v.sum.oneofKind === 'optional' && !v.sum.optional.value
 }
 
 function applyStep(v: Value, step: Step, isLast: boolean): Value[] {
+    if (isNone(v)) {
+        throw new PathError('optional value is None')
+    }
     const sum = v.sum
     switch (step.kind) {
         case 'each':
@@ -117,8 +102,6 @@ function applyStep(v: Value, step: Step, isLast: boolean): Value[] {
                     return sum.list.elements
                 case 'textMap':
                     return sum.textMap.entries.map((e) => present(e.value))
-                case 'genMap':
-                    return sum.genMap.entries.map((e) => present(e.value))
                 default:
                     throw new PathError(`'[]' applied to ${describeKind(v)}`)
             }
@@ -157,37 +140,24 @@ function selectName(v: Value, name: string, isLast: boolean): Value {
             }
             return present(sum.variant.value)
         case 'list':
-        case 'textMap':
-        case 'genMap':
             if (name === 'length' && isLast) {
-                return int64(elementCount(v))
+                return int64(sum.list.elements.length)
+            }
+            break
+        case 'textMap':
+            if (name === 'length' && isLast) {
+                return int64(sum.textMap.entries.length)
             }
             break
     }
     throw new PathError(`'${name}' applied to ${describeKind(v)}`)
 }
 
-function elementCount(v: Value): number {
-    switch (v.sum.oneofKind) {
-        case 'list':
-            return v.sum.list.elements.length
-        case 'textMap':
-            return v.sum.textMap.entries.length
-        case 'genMap':
-            return v.sum.genMap.entries.length
-        default:
-            return 0
-    }
-}
-
-function unwrapOptional(v: Value): Value {
+// Unwraps Some, however nested. A None has nothing to unwrap and is returned as is.
+function unwrapSome(v: Value): Value {
     let current = v
-    while (current.sum.oneofKind === 'optional') {
-        const inner = current.sum.optional.value
-        if (!inner) {
-            throw new PathError('optional value is None')
-        }
-        current = inner
+    while (current.sum.oneofKind === 'optional' && current.sum.optional.value) {
+        current = current.sum.optional.value
     }
     return current
 }

@@ -19,7 +19,6 @@ import { useTransactions } from '../hooks/useTransactions'
 import { parsePreparedTransaction } from '@canton-network/core-tx-visualizer'
 
 import * as sdk from '@canton-network/dapp-sdk'
-import { popup } from '@canton-network/core-wallet-ui-components'
 import { prettyjson } from '../utils'
 
 export function LedgerSubmission(props: {
@@ -44,25 +43,6 @@ export function LedgerSubmission(props: {
             .catch((err) => {
                 console.error('Error creating ping contract:', err)
                 setLoading(false)
-                setErrorMsg(
-                    err instanceof Error ? err.message : JSON.stringify(err)
-                )
-            })
-    }
-
-    function openApprovePreview(demo: 'two-pings' | 'allocation') {
-        setErrorMsg('')
-        sdk.status()
-            .then((status) => {
-                const userUrl = status.provider.userUrl
-                if (!userUrl) {
-                    setErrorMsg('The wallet did not report its address.')
-                    return
-                }
-                const base = userUrl.replace(/\/login\/?$/, '')
-                popup.open(`${base}/approve/index.html?demo=${demo}`)
-            })
-            .catch((err) => {
                 setErrorMsg(
                     err instanceof Error ? err.message : JSON.stringify(err)
                 )
@@ -397,18 +377,6 @@ export function LedgerSubmission(props: {
                     onClick={createPingContractAndWait}
                 >
                     create Ping contract and wait
-                </button>
-                <button
-                    disabled={!connected || loading}
-                    onClick={() => openApprovePreview('two-pings')}
-                >
-                    preview two Ping contracts
-                </button>
-                <button
-                    disabled={!connected || loading}
-                    onClick={() => openApprovePreview('allocation')}
-                >
-                    preview two-leg allocation
                 </button>
                 <button
                     disabled={!props.primaryParty || loading}

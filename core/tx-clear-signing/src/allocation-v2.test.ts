@@ -11,6 +11,7 @@ import { decodePreparedTransaction } from '@canton-network/core-tx-visualizer'
 import { allocationV2Multileg } from './__tests__/fixtures/allocation-v2-multileg.js'
 import { clearSign, type OperationDescription } from './clear-sign.js'
 import { shippedDescriptors } from './shipped.js'
+import { intentText } from './__tests__/helpers.js'
 
 const V1_INTERFACE = {
     packageId: '#splice-api-token-allocation-instruction-v1',
@@ -118,7 +119,7 @@ describe('AllocationFactory_Allocate', () => {
                 entityName: 'AllocationFactory',
             },
         })
-        expect(op?.intent).toContain('of 2 transfer legs')
+        expect(intentText(op)).toContain('of 2 transfer legs')
         const legs = field(op, 'allocation.transferLegSides')
         expect(legs).toEqual(expect.any(String))
         expect(JSON.parse(legs as string)).toMatchObject([
@@ -151,7 +152,7 @@ describe('AllocationFactory_Allocate', () => {
         expect(op).toMatchObject({
             choiceId: 'AllocationFactory_Allocate',
             status: 'fallback',
-            intent: 'Allocate funds for a settlement',
+            intent: [{ kind: 'text', text: 'Allocate funds for a settlement' }],
             interface: V1_INTERFACE,
         })
     })

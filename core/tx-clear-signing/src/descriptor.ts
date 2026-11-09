@@ -2,25 +2,30 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { z } from 'zod'
-import { CONSTANT_PREFIX, CONTRACT_PREFIX, parseIntent } from './intent.js'
+import { CONTRACT_PREFIX, parseIntent } from './intent.js'
 
+// The patterns are those of canton-clear-signing-v1.schema.json. The conformance test runs the
+// schema's own valid and invalid examples through this parser.
 const SCHEMA_ID = 'https://example.org/canton-clear-signing/v1/schema.json'
 
 const NAME = '[A-Za-z_][A-Za-z0-9_]*'
-const DOTTED_NAME = `${NAME}(\\.${NAME})*`
-const MAP_KEY = '\\["([^"\\\\]|\\\\.)*"\\]'
-const STEP = `(${NAME}(${MAP_KEY})*|\\[\\])`
+const MAP_KEY = '\\["(?:[^"\\\\]|\\\\.)*"\\]'
+const NAME_STEP = `${NAME}(?:${MAP_KEY})*`
+// The first step is a name. Later steps are a name or `[]`.
+const STEPS = `${NAME_STEP}(?:\\.(?:${NAME_STEP}|\\[\\]))*`
 
 const identifier = new RegExp(`^${NAME}$`)
-const dottedName = new RegExp(`^${DOTTED_NAME}$`)
-const ARGUMENT_PATH = `${STEP}(\\.${STEP})*`
-const pathPattern = new RegExp(
-    `^(${ARGUMENT_PATH}|@\\.contract\\.${ARGUMENT_PATH}|\\$\\.metadata\\.constants\\.${NAME})$`
-)
+const dottedName = new RegExp(`^${NAME}(?:\\.${NAME})*$`)
+const pathPattern = new RegExp(`^(?:${STEPS}|@\\.contract\\.${STEPS})$`)
 const enumRef = new RegExp(`^\\$\\.metadata\\.enums\\.${NAME}$`)
 const semver =
     /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$/
-const nonBlank = /\S/
+/** One line with a non-whitespace character. */
+const displayText = /^[^\r\n]*\S[^\r\n]*$/
+/** One line without leading or trailing whitespace. */
+const trimmedLine = /^\S(?:[^\r\n]*\S)?$/
+/** Like `trimmedLine`, and without braces, so it cannot contain a placeholder. */
+const stableIntent = /^[^\s{}](?:[^\r\n{}]*[^\s{}])?$/
 
 const FORMATS = [
     'string',
@@ -37,32 +42,33 @@ const FORMATS = [
 const FieldSchema = z
     .strictObject({
         path: z.string().regex(pathPattern),
-        label: z.string().optional(),
+        label: z.string().regex(displayText).optional(),
         format: z.enum(FORMATS).optional(),
         params: z.strictObject({ $ref: z.string().regex(enumRef) }).optional(),
     })
-    .refine((f) => f.format !== 'enum' || f.params !== undefined, {
-        message: "format 'enum' requires params",
-    })
-    .refine((f) => f.format === 'enum' || f.params === undefined, {
-        message: "params are only allowed with format 'enum'",
+    .refine((f) => (f.format === 'enum') === (f.params !== undefined), {
+        message:
+            "params are required with format 'enum' and forbidden otherwise",
     })
 
 const OperationSchema = z.strictObject({
-    intent: z.string().regex(nonBlank),
+    intent: z.string().regex(stableIntent),
     interpolatedIntent: z.string().optional(),
     fields: z.array(FieldSchema).optional(),
 })
 
 const EnumTableSchema = z
-    .record(z.string(), z.string().regex(nonBlank))
+    .record(
+        z.union([z.string().regex(identifier), z.literal(['true', 'false'])]),
+        z.string().regex(displayText)
+    )
     .refine((table) => Object.keys(table).length > 0, {
         message: 'an enum table needs at least one entry',
     })
 
 const DescriptorSchema = z.strictObject({
-    $schema: z.string().refine((s) => s === SCHEMA_ID, {
-        message: `unsupported schema; expected '${SCHEMA_ID}'`,
+    $schema: z.literal(SCHEMA_ID, {
+        error: `unsupported schema; expected '${SCHEMA_ID}'`,
     }),
     $comment: z.string().optional(),
     context: z.strictObject({
@@ -74,15 +80,9 @@ const DescriptorSchema = z.strictObject({
     }),
     metadata: z.strictObject({
         version: z.string().regex(semver),
-        publisher: z.string().regex(nonBlank),
-        name: z.string().regex(nonBlank),
+        publisher: z.string().regex(trimmedLine),
+        name: z.string().regex(trimmedLine),
         url: z.url().optional(),
-        constants: z
-            .record(
-                z.string().regex(identifier),
-                z.union([z.string(), z.number(), z.boolean(), z.null()])
-            )
-            .optional(),
         enums: z
             .record(z.string().regex(identifier), EnumTableSchema)
             .optional(),
@@ -92,6 +92,9 @@ const DescriptorSchema = z.strictObject({
             create: OperationSchema.optional(),
             exercises: z
                 .record(z.string().regex(identifier), OperationSchema)
+                .refine((e) => Object.keys(e).length > 0, {
+                    message: 'exercises needs at least one entry',
+                })
                 .optional(),
         })
         .refine((d) => d.create !== undefined || d.exercises !== undefined, {
@@ -113,10 +116,10 @@ export class DescriptorError extends Error {
 }
 
 /**
- * Validates descriptor JSON against the v1 descriptor format, including the rules JSON Schema cannot
- * express: every placeholder equals the path of a declared field, contract fields are declared once in
- * `create` and read as `{@.contract.<path>}` from an exercise, every enum reference exists, and every
- * `$.metadata.constants` path names a string, number or boolean constant.
+ * Validates descriptor JSON against the v1 schema, and then against the rules a JSON Schema cannot
+ * express: an operation declares each path once, every placeholder equals the path of a declared
+ * field, contract fields are declared once in `create` and read as `{@.contract.<path>}` from an
+ * exercise, and every enum reference names a table.
  *
  * @throws DescriptorError listing every problem found
  */
@@ -138,53 +141,42 @@ export function parseDescriptor(json: unknown): Descriptor {
 }
 
 function crossReferenceProblems(d: Descriptor): string[] {
-    const problems: string[] = []
     const create = d.display.create
-    const contractPaths = create ? fieldPaths(create) : undefined
-    if (create) {
-        problems.push(...operationProblems(d, 'create', create, undefined))
-    }
-    const exercises = d.display.exercises ?? {}
-    for (const key of Object.keys(exercises).sort()) {
-        const op = exercises[key]
-        if (op) {
-            problems.push(
-                ...operationProblems(
-                    d,
-                    `exercises.${key}`,
-                    op,
-                    contractPaths ?? []
-                )
-            )
-        }
+    const problems = create ? operationProblems(d, 'create', create) : []
+    const contractPaths = create ? fieldPaths(create) : []
+    for (const [choice, op] of Object.entries(d.display.exercises ?? {})) {
+        problems.push(
+            ...operationProblems(d, `exercises.${choice}`, op, contractPaths)
+        )
     }
     return problems
 }
 
-// contractPaths is undefined for create, where @.contract does not exist, and the create field
-// paths for an exercise.
+// contractPaths is the create field paths for an exercise, and absent for create, where @.contract
+// does not exist.
 function operationProblems(
     d: Descriptor,
     where: string,
     op: Operation,
-    contractPaths: string[] | undefined
+    contractPaths?: string[]
 ): string[] {
     const problems: string[] = []
+    const ownPaths = fieldPaths(op)
+    const seen = new Set<string>()
     for (const f of op.fields ?? []) {
+        if (seen.has(f.path)) {
+            problems.push(
+                `${where}: field '${f.path}' is declared more than once`
+            )
+        }
+        seen.add(f.path)
         if (f.path.startsWith(CONTRACT_PREFIX)) {
             problems.push(
                 `${where}: field '${f.path}' reads the contract; declare it in create`
             )
         }
-        const constant = constantProblem(d, f.path)
-        if (constant !== undefined) {
-            problems.push(`${where}: field '${f.path}' ${constant}`)
-        }
         const enumName = f.params?.$ref.slice('$.metadata.enums.'.length)
-        if (
-            enumName !== undefined &&
-            d.metadata.enums?.[enumName] === undefined
-        ) {
+        if (enumName !== undefined && !d.metadata.enums?.[enumName]) {
             problems.push(
                 `${where}: field '${f.path}' references missing enum '${f.params?.$ref}'`
             )
@@ -197,42 +189,26 @@ function operationProblems(
     } catch (err) {
         return [...problems, `${where}: ${(err as Error).message}`]
     }
-    const ownPaths = fieldPaths(op)
     for (const segment of segments) {
         if (segment.kind !== 'placeholder') continue
         const p = segment.path
-        if (p.startsWith(CONTRACT_PREFIX)) {
-            const contractPath = p.slice(CONTRACT_PREFIX.length)
-            if (contractPaths === undefined) {
+        if (!p.startsWith(CONTRACT_PREFIX)) {
+            if (!ownPaths.includes(p)) {
                 problems.push(
-                    `${where}: placeholder '${p}' reads the contract outside an exercise`
-                )
-            } else if (!contractPaths.includes(contractPath)) {
-                problems.push(
-                    `${where}: placeholder '${p}' has no field '${contractPath}' in create`
+                    `${where}: placeholder '${p}' has no field with that path`
                 )
             }
-        } else if (!ownPaths.includes(p)) {
+        } else if (contractPaths === undefined) {
             problems.push(
-                `${where}: placeholder '${p}' has no field with that path`
+                `${where}: placeholder '${p}' reads the contract outside an exercise`
+            )
+        } else if (!contractPaths.includes(p.slice(CONTRACT_PREFIX.length))) {
+            problems.push(
+                `${where}: placeholder '${p}' has no field '${p.slice(CONTRACT_PREFIX.length)}' in create`
             )
         }
     }
     return problems
-}
-
-function constantProblem(d: Descriptor, path: string): string | undefined {
-    if (!path.startsWith(CONSTANT_PREFIX)) return undefined
-    const name = path.slice(CONSTANT_PREFIX.length)
-    const value = d.metadata.constants?.[name]
-    if (
-        typeof value === 'string' ||
-        typeof value === 'number' ||
-        typeof value === 'boolean'
-    ) {
-        return undefined
-    }
-    return `has no constant '${name}'`
 }
 
 function fieldPaths(op: Operation): string[] {

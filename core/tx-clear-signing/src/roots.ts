@@ -67,14 +67,6 @@ export function rootNodes(tx: PreparedTransaction): RootNode[] {
     })
 }
 
-export function rootTemplate(node: RootNode): TemplateRef {
-    const id =
-        node.kind === 'create'
-            ? node.create.templateId
-            : node.exercise.templateId
-    return templateRef(id, node.nodeId)
-}
-
 export function templateRef(
     id: Identifier | undefined,
     nodeId: string
@@ -94,23 +86,23 @@ export function templateKey(t: TemplateRef): string {
 }
 
 /**
- * The create argument of the contract an exercise uses: an input contract, or one created by a node
- * of the same transaction. Its module and entity must be the exercise's. Its package may differ,
- * because an upgrade keeps the name and changes the package.
+ * The create argument of the contract an exercise acts on: an input contract, or one created by a node
+ * of the same transaction. It must be of the exercised template's package name, module and entity. Its
+ * package ID may differ, because an upgrade keeps the package name and changes the package ID.
  *
- * @throws TransactionShapeError when the contract id occurs more than once, or names another template
+ * @returns undefined when the transaction does not carry the contract
+ * @throws TransactionShapeError when the contract ID occurs more than once, or names another template
  */
 export function contractArgument(
     tx: PreparedTransaction,
-    contractId: string,
-    template: TemplateRef
+    exercise: Exercise
 ): Value | undefined {
     const found: Create[] = []
     for (const input of tx.metadata?.inputContracts ?? []) {
         const contract = input.contract
         if (
             contract.oneofKind === 'v1' &&
-            contract.v1.contractId === contractId
+            contract.v1.contractId === exercise.contractId
         ) {
             found.push(contract.v1)
         }
@@ -121,25 +113,31 @@ export function contractArgument(
         const nodeType = versioned.v1.nodeType
         if (
             nodeType.oneofKind === 'create' &&
-            nodeType.create.contractId === contractId
+            nodeType.create.contractId === exercise.contractId
         ) {
             found.push(nodeType.create)
         }
     }
     if (found.length > 1) {
         throw new TransactionShapeError(
-            `contract '${contractId}' occurs ${found.length} times`
+            `contract '${exercise.contractId}' occurs ${found.length} times`
         )
     }
     const create = found[0]
     if (!create) return undefined
-    const id = create.templateId
-    const name = `${id?.moduleName}:${id?.entityName}`
-    const expected = `${template.moduleName}:${template.entityName}`
-    if (!id || name !== expected) {
+    const actual = qualifiedName(create.packageName, create.templateId)
+    const expected = qualifiedName(exercise.packageName, exercise.templateId)
+    if (actual !== expected) {
         throw new TransactionShapeError(
-            `contract '${contractId}' is '${name}', not '${expected}'`
+            `contract '${exercise.contractId}' is '${actual}', not '${expected}'`
         )
     }
     return create.argument
+}
+
+function qualifiedName(
+    packageName: string,
+    id: Identifier | undefined
+): string {
+    return `${packageName}:${id?.moduleName}:${id?.entityName}`
 }

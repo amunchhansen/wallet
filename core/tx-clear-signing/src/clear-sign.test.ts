@@ -5,18 +5,20 @@ import { describe, expect, it } from 'vitest'
 import {
     Exercise,
     PreparedTransaction,
+    type Value,
 } from '@canton-network/core-ledger-proto'
 import { decodePreparedTransaction } from '@canton-network/core-tx-visualizer'
 import { clearSign } from './clear-sign.js'
 import { parseDescriptor } from './descriptor.js'
 import { TransactionShapeError } from './roots.js'
 import {
+    intentText,
     OTHER,
     OWNER,
     VECTOR_PACKAGE,
     vectorDescriptor,
 } from './__tests__/helpers.js'
-import pingJson from './__tests__/descriptors/ping.json'
+import pingJson from './__tests__/schema-examples/ping.json'
 import {
     adminWorkflowsPingCreate,
     builtinPingCreate,
@@ -47,8 +49,15 @@ function encode(tx: PreparedTransaction): string {
     return btoa(binary)
 }
 
-// A Respond exercise on the Ping that builtinPingCreate creates, with that Ping as input contract.
-function respondToPing(): PreparedTransaction {
+const NO_ARGUMENT: Value = {
+    sum: { oneofKind: 'record', record: { fields: [] } },
+}
+
+// An exercise on the Ping that builtinPingCreate creates, with that Ping as input contract.
+function exercisePing(
+    choiceId = 'Respond',
+    chosenValue = NO_ARGUMENT
+): PreparedTransaction {
     const created = decodePreparedTransaction(builtinPingCreate)
     const node = created.transaction?.nodes[0]?.versionedNode
     const nodeType = node?.oneofKind === 'v1' ? node.v1.nodeType : undefined
@@ -76,13 +85,8 @@ function respondToPing(): PreparedTransaction {
                                     contractId: create.contractId,
                                     packageName: create.packageName,
                                     templateId,
-                                    choiceId: 'Respond',
-                                    chosenValue: {
-                                        sum: {
-                                            oneofKind: 'record',
-                                            record: { fields: [] },
-                                        },
-                                    },
+                                    choiceId,
+                                    chosenValue,
                                     consuming: true,
                                 }),
                             },
@@ -115,7 +119,15 @@ describe('clearSign', () => {
                     template: ping.context.template,
                     descriptor: PING_DESCRIPTOR,
                     status: 'described',
-                    intent: `Ping ${PING_ID} from ${ALICE} to ${ALICE}`,
+                    // Values are kept apart from the descriptor's wording.
+                    intent: [
+                        { kind: 'text', text: 'Ping ' },
+                        { kind: 'value', path: 'id', value: PING_ID },
+                        { kind: 'text', text: ' from ' },
+                        { kind: 'value', path: 'initiator', value: ALICE },
+                        { kind: 'text', text: ' to ' },
+                        { kind: 'value', path: 'responder', value: ALICE },
+                    ],
                     fields: [
                         { label: 'Ping ID', path: 'id', value: PING_ID },
                         { label: 'Initiator', path: 'initiator', value: ALICE },
@@ -132,7 +144,9 @@ describe('clearSign', () => {
         expect(result.complete).toBe(false)
         expect(result.operations[0]).toMatchObject({
             status: 'undescribed',
-            intent: 'Create Canton.Internal.Ping:Ping',
+            intent: [
+                { kind: 'text', text: 'Create Canton.Internal.Ping:Ping' },
+            ],
             fields: [],
         })
         expect(result.operations[0]).not.toHaveProperty('descriptor')
@@ -147,19 +161,19 @@ describe('clearSign', () => {
     })
 
     it('reads the exercised contract through @.contract', () => {
-        const [op] = clearSign(encode(respondToPing()), [ping]).operations
+        const [op] = clearSign(encode(exercisePing()), [ping]).operations
         expect(op).toMatchObject({
             kind: 'exercise',
             choiceId: 'Respond',
             descriptor: PING_DESCRIPTOR,
             status: 'described',
-            intent: `Respond to ping ${PING_ID} from ${ALICE}`,
         })
+        expect(intentText(op)).toBe(`Respond to ping ${PING_ID} from ${ALICE}`)
         expect(op).not.toHaveProperty('interface')
     })
 
     it('identifies an exercise without a descriptor', () => {
-        const [op] = clearSign(encode(respondToPing()), []).operations
+        const [op] = clearSign(encode(exercisePing()), []).operations
         expect(op).toMatchObject({
             kind: 'exercise',
             choiceId: 'Respond',
@@ -173,14 +187,14 @@ describe('clearSign', () => {
             ...pingJson,
             display: { create: pingJson.display.create },
         })
-        const [op] = clearSign(encode(respondToPing()), [
-            createsOnly,
-        ]).operations
+        const [op] = clearSign(encode(exercisePing()), [createsOnly]).operations
         expect(op).toMatchObject({
             status: 'undescribed',
-            intent: 'Exercise Respond on Canton.Internal.Ping:Ping',
             descriptor: PING_DESCRIPTOR,
         })
+        expect(intentText(op)).toBe(
+            'Exercise Respond on Canton.Internal.Ping:Ping'
+        )
     })
 
     it('describes an interface choice by the template and the choice name', () => {
@@ -205,12 +219,12 @@ describe('clearSign', () => {
                 entityName: 'Asset',
             },
             status: 'described',
-            intent: `Poke the asset of ${OWNER}`,
         })
+        expect(intentText(op)).toBe(`Poke the asset of ${OWNER}`)
     })
 
     it('rejects a contract id that occurs twice', () => {
-        const tx = respondToPing()
+        const tx = exercisePing()
         const input = tx.metadata?.inputContracts[0]?.contract
         const nodes = tx.transaction?.nodes
         if (input?.oneofKind !== 'v1' || !nodes) {
@@ -229,19 +243,50 @@ describe('clearSign', () => {
     })
 
     it('rejects a contract whose template name differs from the exercise', () => {
-        const tx = respondToPing()
+        const tx = exercisePing()
         const input = tx.metadata?.inputContracts[0]?.contract
         if (input?.oneofKind !== 'v1' || !input.v1.templateId) {
             throw new Error('fixture has no input contract')
         }
         input.v1.templateId.entityName = 'Other'
         expect(() => clearSign(encode(tx), [ping])).toThrow(
-            "is 'Canton.Internal.Ping:Other', not 'Canton.Internal.Ping:Ping'"
+            /is '.*:Canton\.Internal\.Ping:Other', not '.*:Canton\.Internal\.Ping:Ping'/
         )
     })
 
-    it('allows a contract whose package differs from the exercise', () => {
-        const tx = respondToPing()
+    it('rejects a contract whose package name differs from the exercise', () => {
+        const tx = exercisePing()
+        const input = tx.metadata?.inputContracts[0]?.contract
+        if (input?.oneofKind !== 'v1') {
+            throw new Error('fixture has no input contract')
+        }
+        input.v1.packageName = 'another-package'
+        expect(() => clearSign(encode(tx), [ping])).toThrow(
+            /is 'another-package:Canton\.Internal\.Ping:Ping'/
+        )
+    })
+
+    it('shows a None field and falls back when a placeholder is None', () => {
+        const none: Value = { sum: { oneofKind: 'optional', optional: {} } }
+        const argument: Value = {
+            sum: {
+                oneofKind: 'record',
+                record: { fields: [{ label: 'anyone', value: none }] },
+            },
+        }
+        const result = clearSign(encode(exercisePing('AbortPing', argument)), [
+            ping,
+        ])
+        expect(result.complete).toBe(false)
+        expect(result.operations[0]).toMatchObject({
+            status: 'fallback',
+            intent: [{ kind: 'text', text: 'Abort ping' }],
+            fields: [{ path: 'anyone', value: 'None' }],
+        })
+    })
+
+    it('allows a contract whose package ID differs from the exercise', () => {
+        const tx = exercisePing()
         const input = tx.metadata?.inputContracts[0]?.contract
         if (input?.oneofKind !== 'v1' || !input.v1.templateId) {
             throw new Error('fixture has no input contract')
@@ -267,7 +312,7 @@ describe('clearSign', () => {
         })
         const result = clearSign(createAndExercise.preparedTransaction, [plain])
         expect(result.complete).toBe(true)
-        expect(result.operations.map((op) => op.intent)).toEqual([
+        expect(result.operations.map(intentText)).toEqual([
             `Create a plain contract for ${OWNER}`,
             `Check the contract of ${OWNER}`,
         ])
@@ -287,7 +332,7 @@ describe('clearSign', () => {
         })
         const result = clearSign(nestedCreates.preparedTransaction, [driver])
         expect(result.operations).toHaveLength(1)
-        expect(result.operations[0]?.intent).toBe(
+        expect(intentText(result.operations[0])).toBe(
             'Create contracts 3 levels deep'
         )
     })
@@ -326,10 +371,6 @@ describe('clearSign', () => {
                         },
                         { path: 'values.recordValue' },
                         { path: 'values.unitValue', format: 'raw' },
-                        {
-                            path: '$.metadata.constants.network',
-                            format: 'string',
-                        },
                     ],
                 },
             },
@@ -351,13 +392,12 @@ describe('clearSign', () => {
             '7',
             ['first', 'second'],
             ['2', '1'],
-            ['one', 'three'],
+            "'[]' applied to genMap",
             'pair',
             '1.5000000000',
             'green',
             '{"name":"pair","count":"2"}',
             '()',
-            'localnet',
         ])
     })
 
@@ -379,12 +419,12 @@ describe('clearSign', () => {
         const [op] = clearSign(maps.preparedTransaction, [
             mapsDescriptor,
         ]).operations
-        expect(op?.intent).toBe('alpha is 2 of 3 entries; inner is x')
+        expect(intentText(op)).toBe('alpha is 2 of 3 entries; inner is x')
         expect(op?.fields.map((f) => f.value ?? f.error)).toEqual([
             '2',
             '3',
             'x',
-            '3',
+            "'length' applied to genMap",
             "no map entry 'missing'",
         ])
     })
@@ -414,7 +454,7 @@ describe('clearSign', () => {
         expect(result.complete).toBe(false)
         expect(result.operations[0]).toMatchObject({
             status: 'fallback',
-            intent: 'Variants',
+            intent: [{ kind: 'text', text: 'Variants' }],
             fields: [
                 { path: 'colors.[]', value: ['red', 'blue'] },
                 {

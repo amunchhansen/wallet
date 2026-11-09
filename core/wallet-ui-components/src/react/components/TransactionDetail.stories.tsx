@@ -356,7 +356,14 @@ const clearSigning: ClearSigningResult = {
                 version: '1.0.0',
             },
             status: 'described',
-            intent: 'Ping ping-1 from alice::1220aa to bob::1220bb',
+            intent: [
+                { kind: 'text', text: 'Ping ' },
+                { kind: 'value', path: 'id', value: 'ping-1' },
+                { kind: 'text', text: ' from ' },
+                { kind: 'value', path: 'initiator', value: 'alice::1220aa' },
+                { kind: 'text', text: ' to ' },
+                { kind: 'value', path: 'responder', value: 'bob::1220bb' },
+            ],
             fields: [
                 { label: 'Ping ID', path: 'id', value: 'ping-1' },
                 {
@@ -364,10 +371,11 @@ const clearSigning: ClearSigningResult = {
                     path: 'executors.[]',
                     value: ['alice::1220aa', 'bob::1220bb'],
                 },
+                { label: 'Deadline', path: 'deadline', value: 'None' },
                 {
-                    label: 'Deadline',
-                    path: 'deadline',
-                    error: 'optional value is None',
+                    label: 'Amount',
+                    path: 'amount',
+                    error: "format 'number' does not accept text",
                 },
             ],
         },
@@ -377,7 +385,12 @@ const clearSigning: ClearSigningResult = {
             template: pingTemplate,
             choiceId: 'Archive',
             status: 'undescribed',
-            intent: 'Exercise Archive on Canton.Internal.Ping:Ping',
+            intent: [
+                {
+                    kind: 'text',
+                    text: 'Exercise Archive on Canton.Internal.Ping:Ping',
+                },
+            ],
             fields: [],
         },
         {
@@ -397,7 +410,7 @@ const clearSigning: ClearSigningResult = {
                 version: '1.0.0',
             },
             status: 'described',
-            intent: 'Allocate funds for a settlement',
+            intent: [{ kind: 'text', text: 'Allocate funds for a settlement' }],
             fields: [],
         },
     ],
@@ -408,9 +421,11 @@ export const ClearSigned: Story = {
     play: async ({ canvasElement }) => {
         for (const text of [
             'What you are signing',
-            'Ping ping-1 from alice::1220aa to bob::1220bb',
+            // Values in the intent are rendered apart from the wording
+            'ping-1',
             'alice::1220aa, bob::1220bb',
-            'Cannot display: optional value is None',
+            'None',
+            "Cannot display: format 'number' does not accept text",
             // The undescribed operation's intent is followed by its badge
             /^Exercise Archive on Canton\.Internal\.Ping:Ping/,
             'Not described',
@@ -440,6 +455,8 @@ export const ClearSignedOperationKinds: Story = {
         for (const text of [
             'Archive',
             'AllocationFactory_Allocate',
+            // The interface the choice is exercised through
+            'Splice.Api.Token.AllocationInstructionV2:AllocationFactory',
             'Splice.ExternalPartyAmuletRules:ExternalPartyAmuletRules',
             factoryTemplate.packageId,
             // The descriptor's own claim about itself
@@ -468,6 +485,20 @@ export const WithoutClearSigning: Story = {
         await expect(
             queryByShadowText(canvasElement, 'What you are signing')
         ).not.toBeInTheDocument()
+        await expect(
+            await findByShadowRole(canvasElement, 'button', { name: 'Approve' })
+        ).toBeEnabled()
+    },
+}
+
+export const ClearSigningFailed: Story = {
+    args: { clearSigningError: "contract '00ab' occurs 2 times" },
+    play: async ({ canvasElement }) => {
+        await expect(
+            await findByShadowRole(canvasElement, 'alert')
+        ).toHaveTextContent(
+            "This transaction could not be described: contract '00ab' occurs 2 times."
+        )
         await expect(
             await findByShadowRole(canvasElement, 'button', { name: 'Approve' })
         ).toBeEnabled()

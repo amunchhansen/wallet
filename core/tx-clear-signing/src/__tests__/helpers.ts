@@ -1,6 +1,7 @@
 // Copyright (c) 2025-2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { OperationDescription } from '../clear-sign.js'
 import { type Descriptor, parseDescriptor } from '../descriptor.js'
 
 /** Package of the templates in the core-tx-hashing vectors copied to fixtures/. */
@@ -29,9 +30,15 @@ export function vectorDescriptor(
             version: '1.0.0',
             publisher: 'test',
             name: entityName,
-            constants: { network: 'localnet' },
             ...(enums && { enums }),
         },
         display,
     })
+}
+
+/** The intent as one string, for assertions on its wording. */
+export function intentText(op: OperationDescription | undefined): string {
+    return (op?.intent ?? [])
+        .map((part) => (part.kind === 'text' ? part.text : part.value))
+        .join('')
 }

@@ -10,6 +10,7 @@ import type { ParsedTransactionInfo } from '@canton-network/core-tx-visualizer'
 import type {
     ClearSigningResult,
     DescribedField,
+    IntentPart,
     OperationDescription,
     TemplateRef,
 } from '@canton-network/core-tx-clear-signing'
@@ -74,6 +75,9 @@ class WgTransactionDetail extends BaseElement {
     /** The clear-signing description of the transaction's root operations, when available */
     @property({ type: Object })
     accessor clearSigning: ClearSigningResult | null = null
+
+    /** Why the transaction could not be described at all, when it could not */
+    @property() accessor clearSigningError: string | null = null
 
     @property() accessor createdAt: string | null = null
 
@@ -321,6 +325,14 @@ class WgTransactionDetail extends BaseElement {
                 word-break: break-word;
             }
 
+            .intent-value {
+                font-family: var(--bs-font-monospace);
+                font-weight: var(--wg-font-weight-normal);
+                padding: 0 var(--wg-space-1);
+                border-radius: var(--wg-radius-sm);
+                background: rgba(var(--wg-shade-rgb), 0.08);
+            }
+
             .operation-origin dd.identifier {
                 font-family: var(--bs-font-monospace);
             }
@@ -437,6 +449,22 @@ class WgTransactionDetail extends BaseElement {
 
     private renderClearSigning() {
         const result = this.clearSigning
+        if (this.clearSigningError) {
+            return html`
+                <section class="field field--stacked clear-signing">
+                    <h2
+                        class="label small fw-semibold text-body-secondary mb-0"
+                    >
+                        What you are signing
+                    </h2>
+                    <div class="alert alert-danger small mb-0" role="alert">
+                        This transaction could not be described:
+                        ${this.clearSigningError}. Review the transaction JSON
+                        before approving.
+                    </div>
+                </section>
+            `
+        }
         if (!result) {
             return nothing
         }
@@ -471,7 +499,7 @@ class WgTransactionDetail extends BaseElement {
                         >${OPERATION_KIND_LABELS[op.kind]}</span
                     >
                     <p class="intent mb-0">
-                        ${op.intent}
+                        ${op.intent.map(renderIntentPart)}
                         ${
                             op.status === 'described'
                                 ? nothing
@@ -676,13 +704,32 @@ function typeName({ moduleName, entityName }: TemplateRef): string {
 
 // What the transaction itself says it does (kind, choice, template), so an operation is identified
 // even when its descriptor words it vaguely or is missing. The descriptor's own claim is kept apart.
+// Values read from the transaction are set apart from the descriptor's wording, so a text value
+// cannot pass as part of the sentence.
+function renderIntentPart(part: IntentPart) {
+    return part.kind === 'text'
+        ? part.text
+        : html`<span class="intent-value" title=${part.path}
+              >${part.value}</span
+          >`
+}
+
 function renderOperationOrigin(op: OperationDescription) {
     const { choiceId, descriptor } = op
     return html`<dl class="operation-origin">
         ${
             op.kind === 'exercise' && choiceId !== undefined
                 ? html`<dt class="label">Choice</dt>
-                      <dd class="identifier">${choiceId}</dd>`
+                      <dd class="identifier">
+                          ${choiceId}${
+                              op.interface
+                                  ? html` <span class="text-body-secondary"
+                                            >via</span
+                                        >
+                                        ${typeName(op.interface)}`
+                                  : nothing
+                          }
+                      </dd>`
                 : nothing
         }
         <dt class="label">${op.kind === 'exercise' ? 'On' : 'Template'}</dt>

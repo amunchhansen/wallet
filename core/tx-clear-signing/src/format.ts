@@ -12,7 +12,7 @@ export class FormatError extends Error {
     }
 }
 
-type EnumTables = Partial<Record<string, Record<string, string>>>
+export type EnumTables = Partial<Record<string, Record<string, string>>>
 
 const MICROS_PER_SECOND = 1_000_000n
 const MS_PER_DAY = 86_400_000
@@ -208,12 +208,10 @@ function toPlain(v: Value | undefined): Plain {
     }
 }
 
-// Values come from the transaction and are untrusted: control and bidirectional-formatting characters
-// could break lines or reorder the text around them, so they are shown escaped.
-const UNSAFE = new RegExp(
-    '[\\p{Cc}\\u061c\\u200e\\u200f\\u202a-\\u202e\\u2066-\\u2069]',
-    'gu'
-)
+// Values come from the transaction and are untrusted. Control, format (bidirectional overrides,
+// zero-width characters) and line or paragraph separator characters could break lines, hide text or
+// reorder the text around them, so they are shown escaped.
+const UNSAFE = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu
 
 function sanitize(s: string): string {
     return s.replace(
