@@ -368,8 +368,8 @@ const clearSigning: ClearSigningResult = {
                 { label: 'Ping ID', path: 'id', value: 'ping-1' },
                 {
                     label: 'Executors',
-                    path: 'executors.[]',
-                    value: ['alice::1220aa', 'bob::1220bb'],
+                    path: 'executors',
+                    value: '["alice::1220aa","bob::1220bb"]',
                 },
                 { label: 'Deadline', path: 'deadline', value: 'None' },
                 {
@@ -423,7 +423,7 @@ export const ClearSigned: Story = {
             'What you are signing',
             // Values in the intent are rendered apart from the wording
             'ping-1',
-            'alice::1220aa, bob::1220bb',
+            '["alice::1220aa","bob::1220bb"]',
             'None',
             "Cannot display: format 'number' does not accept text",
             // The undescribed operation's intent is followed by its badge

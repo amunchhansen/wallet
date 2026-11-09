@@ -356,9 +356,9 @@ describe('clearSign', () => {
                             format: 'contractId',
                         },
                         { path: 'values.optionalValue', format: 'number' },
-                        { path: 'values.listValue.[]', format: 'string' },
-                        { path: 'values.textMapValue.[]', format: 'number' },
-                        { path: 'values.genMapValue.[]', format: 'string' },
+                        { path: 'values.listValue', format: 'raw' },
+                        { path: 'values.textMapValue', format: 'raw' },
+                        { path: 'values.genMapValue', format: 'raw' },
                         { path: 'values.recordValue.name', format: 'string' },
                         {
                             path: 'values.variantValue.Circle',
@@ -390,9 +390,9 @@ describe('clearSign', () => {
             OTHER,
             '003cbb94a4b2470b97999dd6ecbef7cebd5045a57cf6fc1d24e9e1cee1adbcd090ca1212207aa8738571d5ee56e9760a18077666bc7f97e559e8c80722ecf9af3c4977899e',
             '7',
-            ['first', 'second'],
-            ['2', '1'],
-            "'[]' applied to genMap",
+            '["first","second"]',
+            '{"alpha":"2","zeta":"1"}',
+            '[["1","one"],["3","three"]]',
             'pair',
             '1.5000000000',
             'green',
@@ -430,25 +430,18 @@ describe('clearSign', () => {
     })
 
     it('falls back to the stable intent when a placeholder fails', () => {
-        const variants = vectorDescriptor(
-            'Variants',
-            {
-                create: {
-                    intent: 'Variants',
-                    interpolatedIntent:
-                        'Colors {colors.[]}, dogs {animals.[].Dog.name}',
-                    fields: [
-                        {
-                            path: 'colors.[]',
-                            format: 'enum',
-                            params: { $ref: '$.metadata.enums.color' },
-                        },
-                        { path: 'animals.[].Dog.name', format: 'string' },
-                    ],
-                },
+        const variants = vectorDescriptor('Variants', {
+            create: {
+                intent: 'Variants',
+                interpolatedIntent:
+                    '{colors.length} colors, the first is {colors.Red}',
+                fields: [
+                    { path: 'colors.length', format: 'number' },
+                    { path: 'colors.Red', format: 'string' },
+                    { path: 'colors', format: 'raw' },
+                ],
             },
-            { color: { Red: 'red', Blue: 'blue' } }
-        )
+        })
 
         const result = clearSign(variantEnum.preparedTransaction, [variants])
         expect(result.complete).toBe(false)
@@ -456,11 +449,10 @@ describe('clearSign', () => {
             status: 'fallback',
             intent: [{ kind: 'text', text: 'Variants' }],
             fields: [
-                { path: 'colors.[]', value: ['red', 'blue'] },
-                {
-                    path: 'animals.[].Dog.name',
-                    error: "variant is 'Cat', not 'Dog'",
-                },
+                { path: 'colors.length', value: '2' },
+                { path: 'colors.Red', error: "'Red' applied to list" },
+                // A list of variable size is shown whole, with raw.
+                { path: 'colors', value: '["Red","Blue"]' },
             ],
         })
     })

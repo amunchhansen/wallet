@@ -8,7 +8,7 @@
         }
     },
     "metadata": {
-        "version": "1.0.0",
+        "version": "1.1.0",
         "publisher": "Blockdaemon",
         "name": "Canton bong explode (canton-builtin-admin-workflow-ping)"
     },
@@ -17,25 +17,41 @@
             "intent": "Explode",
             "interpolatedIntent": "Explode bong {id} from {initiator} at path {path}, level {maxLevel}",
             "fields": [
-                { "path": "id", "label": "Bong ID", "format": "string" },
+                {
+                    "path": "id",
+                    "label": "Bong ID",
+                    "format": "string"
+                },
                 {
                     "path": "initiator",
                     "label": "Initiator",
                     "format": "party"
                 },
                 {
-                    "path": "validators.[]",
+                    "path": "validators",
                     "label": "Validators",
-                    "format": "party"
+                    "format": "raw"
                 },
                 {
-                    "path": "responders.[]",
+                    "path": "responders",
                     "label": "Responders",
-                    "format": "party"
+                    "format": "raw"
                 },
-                { "path": "path", "label": "Path", "format": "string" },
-                { "path": "maxLevel", "label": "Level", "format": "number" },
-                { "path": "timeout", "label": "Timeout", "format": "dateTime" }
+                {
+                    "path": "path",
+                    "label": "Path",
+                    "format": "string"
+                },
+                {
+                    "path": "maxLevel",
+                    "label": "Level",
+                    "format": "number"
+                },
+                {
+                    "path": "timeout",
+                    "label": "Timeout",
+                    "format": "dateTime"
+                }
             ]
         },
         "exercises": {
@@ -43,7 +59,11 @@
                 "intent": "Process explode",
                 "interpolatedIntent": "Process explode {@.contract.id} path {@.contract.path} as {winner}",
                 "fields": [
-                    { "path": "winner", "label": "Winner", "format": "party" }
+                    {
+                        "path": "winner",
+                        "label": "Winner",
+                        "format": "party"
+                    }
                 ]
             },
             "AbortExplode": {

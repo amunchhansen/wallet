@@ -41,9 +41,9 @@ describe('shippedDescriptors', () => {
         expect(descriptor?.display.create?.fields?.map((f) => f.path)).toEqual([
             'id',
             'initiator',
-            'candidates.[]',
-            'validators.[]',
-            'responders.[]',
+            'candidates',
+            'validators',
+            'responders',
             'maxLevel',
             'timeout',
         ])
@@ -69,7 +69,7 @@ describe('shippedDescriptors', () => {
         expect(byEntity.get('Bong')).toEqual(['AbortBong', 'Ack'])
     })
 
-    it('includes AllocationFactory_Allocate on the external party amulet rules', () => {
+    it('describes only AllocationFactory_Allocate on the external party amulet rules', () => {
         const descriptor = shippedDescriptors().find(
             (d) => d.context.template.entityName === 'ExternalPartyAmuletRules'
         )

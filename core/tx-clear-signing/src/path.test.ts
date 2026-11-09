@@ -7,10 +7,10 @@ import { parsePath, PathError, resolvePath } from './path.js'
 
 describe('parsePath', () => {
     it('splits a path into steps', () => {
-        expect(parsePath('settlement.executors.[]')).toEqual([
+        expect(parsePath('settlement.executors.length')).toEqual([
             { kind: 'name', name: 'settlement' },
             { kind: 'name', name: 'executors' },
-            { kind: 'each' },
+            { kind: 'name', name: 'length' },
         ])
     })
 
@@ -32,6 +32,7 @@ describe('parsePath', () => {
         'values["open',
         '1amount',
         '@.contract.id',
+        'executors.[]',
     ])('rejects %j', (path) => {
         expect(() => parsePath(path)).toThrow(PathError)
     })
@@ -64,22 +65,17 @@ describe('resolvePath', () => {
         )
     })
 
-    it('returns a list for a [] path, even with one element', () => {
+    it('returns a list as a whole', () => {
         const list: Value = {
             sum: { oneofKind: 'list', list: { elements: [int(1)] } },
         }
-        expect(resolvePath(record('xs', list), parsePath('xs.[]'))).toEqual([
-            int(1),
-        ])
+        expect(resolvePath(record('xs', list), parsePath('xs'))).toEqual(list)
     })
 
-    it('does not step into a GenMap', () => {
+    it('does not count a GenMap', () => {
         const genMap: Value = {
             sum: { oneofKind: 'genMap', genMap: { entries: [] } },
         }
-        expect(() =>
-            resolvePath(record('m', genMap), parsePath('m.[]'))
-        ).toThrow("'[]' applied to genMap")
         expect(() =>
             resolvePath(record('m', genMap), parsePath('m.length'))
         ).toThrow("'length' applied to genMap")

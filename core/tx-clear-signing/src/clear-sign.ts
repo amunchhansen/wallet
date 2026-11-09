@@ -22,8 +22,8 @@ import {
 export interface DescribedField {
     label: string
     path: string
-    /** A list when the path contains `[]`. Absent when the field failed. */
-    value?: string | string[]
+    /** Absent when the field failed. */
+    value?: string
     error?: string
 }
 
@@ -277,18 +277,13 @@ function renderPlaceholder(path: string, selected: Selected): string {
     }
     const argument = readsContract ? selected.contract : selected.argument
     const resolved = resolveField(field, argument)
-    const values = Array.isArray(resolved) ? resolved : [resolved]
-    if (values.some(isNone)) {
+    if (isNone(resolved)) {
         throw new PathError(`'${path}' is None`)
     }
-    const formatted = format(resolved, field, enums(selected))
-    return Array.isArray(formatted) ? formatted.join(', ') : formatted
+    return format(resolved, field, enums(selected))
 }
 
-function resolveField(
-    field: Field,
-    argument: Value | undefined
-): Value | Value[] {
+function resolveField(field: Field, argument: Value | undefined): Value {
     if (!argument) {
         throw new PathError(`'${field.path}' has no value to start from`)
     }
@@ -296,14 +291,8 @@ function resolveField(
 }
 
 // A None is shown as `None` in a field: the value is absent, and the user should see that it is.
-function format(
-    resolved: Value | Value[],
-    field: Field,
-    enums: EnumTables
-): string | string[] {
-    const one = (v: Value) =>
-        isNone(v) ? 'None' : formatValue(v, field, enums)
-    return Array.isArray(resolved) ? resolved.map(one) : one(resolved)
+function format(resolved: Value, field: Field, enums: EnumTables): string {
+    return isNone(resolved) ? 'None' : formatValue(resolved, field, enums)
 }
 
 function enums(selected: Selected): EnumTables {

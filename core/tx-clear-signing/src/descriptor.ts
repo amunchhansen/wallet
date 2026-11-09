@@ -10,9 +10,10 @@ const SCHEMA_ID = 'https://example.org/canton-clear-signing/v1/schema.json'
 
 const NAME = '[A-Za-z_][A-Za-z0-9_]*'
 const MAP_KEY = '\\["(?:[^"\\\\]|\\\\.)*"\\]'
+// Every step is a name, with optional map-key steps. There is no step for every element of a list or
+// map: a field shows a list or map of variable size as a whole, with the raw format.
 const NAME_STEP = `${NAME}(?:${MAP_KEY})*`
-// The first step is a name. Later steps are a name or `[]`.
-const STEPS = `${NAME_STEP}(?:\\.(?:${NAME_STEP}|\\[\\]))*`
+const STEPS = `${NAME_STEP}(?:\\.${NAME_STEP})*`
 
 const identifier = new RegExp(`^${NAME}$`)
 const dottedName = new RegExp(`^${NAME}(?:\\.${NAME})*$`)

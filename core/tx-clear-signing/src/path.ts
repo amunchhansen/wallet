@@ -3,10 +3,7 @@
 
 import type { Value } from '@canton-network/core-ledger-proto'
 
-export type Step =
-    | { kind: 'name'; name: string }
-    | { kind: 'key'; key: string }
-    | { kind: 'each' }
+export type Step = { kind: 'name'; name: string } | { kind: 'key'; key: string }
 
 export class PathError extends Error {
     constructor(message: string) {
@@ -25,22 +22,17 @@ export function parsePath(path: string): Step[] {
     const steps: Step[] = []
     let pos = 0
     for (;;) {
-        if (path.startsWith('[]', pos)) {
-            steps.push({ kind: 'each' })
-            pos += 2
-        } else {
-            const name = NAME.exec(path.slice(pos))?.[0]
-            if (name === undefined) {
-                throw new PathError(`invalid path '${path}' at offset ${pos}`)
-            }
-            steps.push({ kind: 'name', name })
-            pos += name.length
-            while (path.startsWith('["', pos)) {
-                const end = quotedKeyEnd(path, pos + 1)
-                const key: unknown = JSON.parse(path.slice(pos + 1, end + 1))
-                steps.push({ kind: 'key', key: String(key) })
-                pos = end + 2
-            }
+        const name = NAME.exec(path.slice(pos))?.[0]
+        if (name === undefined) {
+            throw new PathError(`invalid path '${path}' at offset ${pos}`)
+        }
+        steps.push({ kind: 'name', name })
+        pos += name.length
+        while (path.startsWith('["', pos)) {
+            const end = quotedKeyEnd(path, pos + 1)
+            const key: unknown = JSON.parse(path.slice(pos + 1, end + 1))
+            steps.push({ kind: 'key', key: String(key) })
+            pos = end + 2
         }
         if (pos === path.length) {
             return steps
@@ -72,39 +64,26 @@ function quotedKeyEnd(s: string, start: number): number {
  * into, but is returned when it is the value the path names. A final `length` step on a list or text
  * map yields its number of elements as an int64.
  *
- * @returns a list when the path contains `[]`, even with one element; otherwise the single value
  * @throws PathError when a step does not resolve
  */
-export function resolvePath(root: Value, steps: Step[]): Value | Value[] {
-    let current: Value[] = [root]
+export function resolvePath(root: Value, steps: Step[]): Value {
+    let current = root
     steps.forEach((step, i) => {
-        const isLast = i === steps.length - 1
-        current = current.flatMap((v) => applyStep(unwrapSome(v), step, isLast))
+        current = applyStep(unwrapSome(current), step, i === steps.length - 1)
     })
-    const values = current.map(unwrapSome)
-    const isList = steps.some((step) => step.kind === 'each')
-    return isList ? values : values[0]!
+    return unwrapSome(current)
 }
 
 export function isNone(v: Value): boolean {
     return v.sum.oneofKind === 'optional' && !v.sum.optional.value
 }
 
-function applyStep(v: Value, step: Step, isLast: boolean): Value[] {
+function applyStep(v: Value, step: Step, isLast: boolean): Value {
     if (isNone(v)) {
         throw new PathError('optional value is None')
     }
     const sum = v.sum
     switch (step.kind) {
-        case 'each':
-            switch (sum.oneofKind) {
-                case 'list':
-                    return sum.list.elements
-                case 'textMap':
-                    return sum.textMap.entries.map((e) => present(e.value))
-                default:
-                    throw new PathError(`'[]' applied to ${describeKind(v)}`)
-            }
         case 'key': {
             if (sum.oneofKind !== 'textMap') {
                 throw new PathError(
@@ -115,10 +94,10 @@ function applyStep(v: Value, step: Step, isLast: boolean): Value[] {
             if (!entry) {
                 throw new PathError(`no map entry '${step.key}'`)
             }
-            return [present(entry.value)]
+            return present(entry.value)
         }
         case 'name':
-            return [selectName(v, step.name, isLast)]
+            return selectName(v, step.name, isLast)
     }
 }
 

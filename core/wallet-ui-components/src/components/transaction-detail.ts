@@ -754,5 +754,5 @@ function renderFieldValue(field: DescribedField) {
             >Cannot display: ${field.error}</span
         >`
     }
-    return Array.isArray(field.value) ? field.value.join(', ') : field.value
+    return field.value
 }

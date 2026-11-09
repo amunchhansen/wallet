@@ -8,14 +8,14 @@
         }
     },
     "metadata": {
-        "version": "1.0.0",
+        "version": "1.1.0",
         "publisher": "Blockdaemon",
         "name": "Canton bong proposal"
     },
     "display": {
         "create": {
             "intent": "Bong proposal",
-            "interpolatedIntent": "Propose bong {id} from {initiator} to {responders.[]} at level {maxLevel}, accepted by {candidates.[]}",
+            "interpolatedIntent": "Propose bong {id} from {initiator} at level {maxLevel}",
             "fields": [
                 {
                     "path": "id",
@@ -28,19 +28,19 @@
                     "format": "party"
                 },
                 {
-                    "path": "candidates.[]",
+                    "path": "candidates",
                     "label": "Candidates",
-                    "format": "party"
+                    "format": "raw"
                 },
                 {
-                    "path": "validators.[]",
+                    "path": "validators",
                     "label": "Validators",
-                    "format": "party"
+                    "format": "raw"
                 },
                 {
-                    "path": "responders.[]",
+                    "path": "responders",
                     "label": "Responders",
-                    "format": "party"
+                    "format": "raw"
                 },
                 {
                     "path": "maxLevel",

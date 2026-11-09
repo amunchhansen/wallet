@@ -8,7 +8,7 @@
         }
     },
     "metadata": {
-        "version": "1.0.0",
+        "version": "1.1.0",
         "publisher": "Blockdaemon",
         "name": "Canton bong merge (canton-builtin-admin-workflow-ping)"
     },
@@ -17,24 +17,36 @@
             "intent": "Merge",
             "interpolatedIntent": "Merge bong {id} from {initiator} at path {path}",
             "fields": [
-                { "path": "id", "label": "Bong ID", "format": "string" },
+                {
+                    "path": "id",
+                    "label": "Bong ID",
+                    "format": "string"
+                },
                 {
                     "path": "initiator",
                     "label": "Initiator",
                     "format": "party"
                 },
                 {
-                    "path": "validators.[]",
+                    "path": "validators",
                     "label": "Validators",
-                    "format": "party"
+                    "format": "raw"
                 },
                 {
-                    "path": "responders.[]",
+                    "path": "responders",
                     "label": "Responders",
-                    "format": "party"
+                    "format": "raw"
                 },
-                { "path": "path", "label": "Path", "format": "string" },
-                { "path": "timeout", "label": "Timeout", "format": "dateTime" }
+                {
+                    "path": "path",
+                    "label": "Path",
+                    "format": "string"
+                },
+                {
+                    "path": "timeout",
+                    "label": "Timeout",
+                    "format": "dateTime"
+                }
             ]
         },
         "exercises": {
@@ -42,7 +54,11 @@
                 "intent": "Process merge",
                 "interpolatedIntent": "Process merge {@.contract.id} path {@.contract.path} as {winner}, collapsing {leftId} and {rightId}",
                 "fields": [
-                    { "path": "winner", "label": "Winner", "format": "party" },
+                    {
+                        "path": "winner",
+                        "label": "Winner",
+                        "format": "party"
+                    },
                     {
                         "path": "leftId",
                         "label": "Left collapse",

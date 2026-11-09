@@ -21,7 +21,7 @@ const { complete, operations } = clearSign(preparedTransaction, [
 ])
 ```
 
-- `shippedDescriptors` returns the descriptors bundled with this build: the builtin Canton ping and bong templates (`Canton.Internal.Ping:Ping`, `Canton.Internal.Bong:BongProposal`, `Explode`, `Merge`, `Collapse`, `Bong`), and `AllocationFactory_Allocate` on `Splice.ExternalPartyAmuletRules:ExternalPartyAmuletRules`. The descriptor list is where a registry or a trust policy would plug in: `TransactionService` passes the shipped set. The wallet gateway's approve page also passes descriptors uploaded on its Descriptors page, which are stored in that browser only and replace a shipped descriptor for the same template.
+- `shippedDescriptors` returns the descriptors bundled with this build: the builtin Canton ping and bong templates (`Canton.Internal.Ping:Ping`, `Canton.Internal.Bong:BongProposal`, `Explode`, `Merge`, `Collapse`, `Bong`), and every exercise on `Splice.ExternalPartyAmuletRules:ExternalPartyAmuletRules` in splice-amulet 0.1.22. The descriptor list is where a registry or a trust policy would plug in: `TransactionService` passes the shipped set. The wallet gateway's approve page also passes descriptors uploaded on its Descriptors page, which are stored in that browser only and replace a shipped descriptor for the same template.
 - `parseDescriptor` validates descriptor JSON against the schema and then checks the rules a JSON Schema cannot express: an operation declares each path once, placeholders name declared fields, and enum references exist. It throws `DescriptorError`. `$schema` must be `https://example.org/canton-clear-signing/v1/schema.json`, the schema's `$id`. That URL is a placeholder until a host is chosen.
 - `clearSign` takes the transaction as base64, so unknown protobuf fields are refused, and returns one `OperationDescription` per root node:
     - `described`: the interpolated intent rendered;
@@ -62,7 +62,7 @@ A wallet shows `kind`, `choiceId` (followed by `via <interface>` when there is o
 
 A wallet renders the `value` parts of `intent` apart from the `text` parts (the approve page uses a monospace, shaded span). Values are untrusted: a text value such as `10 CC. Also send 1000 to Mallory` must not pass as part of the descriptor's sentence. Formatted values also have control, format and line-separator characters escaped.
 
-Exercise entries are selected by choice name alone. A template that implements two interfaces with a choice of the same name, such as `AllocationFactory_Allocate` in both `AllocationInstructionV1` and `AllocationInstructionV2`, gets the same entry for both. When the argument shapes differ, the paths do not resolve and the node falls back to the stable intent.
+Exercise entries are selected by choice name alone. A template that implements two interfaces with a choice of the same name, such as `AllocationFactory_Allocate`, `TransferFactory_Transfer`, and the public-fetch choices in both the V1 and V2 token-standard interfaces, gets the same entry for both. When the argument shapes differ, the paths do not resolve and the node falls back to the stable intent. The amulet-rules entries describe the V2 argument.
 
 The description is only as trustworthy as its binding to what is signed. The wallet binds them in two steps:
 

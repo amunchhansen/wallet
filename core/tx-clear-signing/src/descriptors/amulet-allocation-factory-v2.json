@@ -8,7 +8,7 @@
         }
     },
     "metadata": {
-        "version": "1.0.0",
+        "version": "2.0.0",
         "publisher": "<splice publisher>",
         "name": "Amulet rules for external parties",
         "enums": {
@@ -23,13 +23,17 @@
             "intent": "Amulet rules for external parties",
             "interpolatedIntent": "Amulet rules for external parties, administered by {dso}",
             "fields": [
-                { "path": "dso", "label": "Administrator", "format": "party" }
+                {
+                    "path": "dso",
+                    "label": "Administrator",
+                    "format": "party"
+                }
             ]
         },
         "exercises": {
             "AllocationFactory_Allocate": {
                 "intent": "Allocate funds for a settlement",
-                "interpolatedIntent": "Allocate funds at {@.contract.dso} for settlement {settlement.id} of {allocation.transferLegSides.length} transfer legs, authorized by {allocation.authorizer.owner} and settled by {settlement.executors.[]}. {allocation.committed}",
+                "interpolatedIntent": "Allocate funds at {@.contract.dso} for settlement {settlement.id} of {allocation.transferLegSides.length} transfer legs, authorized by {allocation.authorizer.owner}. {allocation.committed}",
                 "fields": [
                     {
                         "path": "settlement.id",
@@ -47,9 +51,9 @@
                         "format": "party"
                     },
                     {
-                        "path": "settlement.executors.[]",
+                        "path": "settlement.executors",
                         "label": "Executors",
-                        "format": "party"
+                        "format": "raw"
                     },
                     {
                         "path": "allocation.transferLegSides",
@@ -60,7 +64,9 @@
                         "path": "allocation.committed",
                         "label": "Commitment",
                         "format": "enum",
-                        "params": { "$ref": "$.metadata.enums.commitment" }
+                        "params": {
+                            "$ref": "$.metadata.enums.commitment"
+                        }
                     },
                     {
                         "path": "allocation.settlementDeadline",
