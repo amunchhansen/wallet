@@ -909,8 +909,14 @@ export const paramSchemas: Record<string, z.ZodType> = {
                 description: 'The internal transaction identifier.',
             },
             partyId: { title: 'partyId', type: 'string' },
+            preparedTransactionHash: {
+                title: 'preparedTransactionHash',
+                type: 'string',
+                description:
+                    'The hash the user approved, base64-encoded, computed by the client from the prepared transaction it displayed. The transaction is signed only if this equals the hash computed from the stored transaction.',
+            },
         },
-        required: ['transactionId', 'partyId'],
+        required: ['transactionId', 'partyId', 'preparedTransactionHash'],
     }),
     signMessage: z.fromJSONSchema({
         title: 'SignMessageParams',

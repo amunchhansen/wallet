@@ -64,4 +64,7 @@ A wallet renders the `value` parts of `intent` apart from the `text` parts (the 
 
 Exercise entries are selected by choice name alone. A template that implements two interfaces with a choice of the same name, such as `AllocationFactory_Allocate` in both `AllocationInstructionV1` and `AllocationInstructionV2`, gets the same entry for both. When the argument shapes differ, the paths do not resolve and the node falls back to the stable intent.
 
-The description is only as trustworthy as its binding to what is signed: compare the transaction's hash with the hash you sign (see `@canton-network/core-tx-hashing`; `TransactionService` does this before every signature).
+The description is only as trustworthy as its binding to what is signed. The wallet binds them in two steps:
+
+1. The approve page computes the hash from the transaction bytes it describes (`hashForReview` in `@canton-network/core-tx-visualizer`), shows that hash, and sends it with the user's `sign` request. If the bytes do not reproduce the hash the gateway reports, approval is disabled.
+2. `TransactionService.sign` recomputes the hash from the stored transaction and signs only if it equals both the stored hash and the hash the user approved. It logs the approval (user, party, hash, time) before anything reaches the signing provider. A service account's automated `signAndExecute` has no reviewer; its approval is logged as the service account's.

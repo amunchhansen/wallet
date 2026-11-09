@@ -9,6 +9,7 @@ import {
     toRelHref,
 } from '@canton-network/core-wallet-ui-components'
 import {
+    hashForReview,
     type ParsedTransactionInfo,
     parsePreparedTransaction,
 } from '@canton-network/core-tx-visualizer'
@@ -41,6 +42,12 @@ export class ApproveUi extends BaseElement {
     @state() accessor commandId = ''
     @state() accessor partyId = ''
     @state() accessor txHash = ''
+    /**
+     * The hash computed here from the transaction on screen, sent with the approval. The gateway signs
+     * only if it equals the hash of the transaction it holds. Null until computed, or on a mismatch.
+     */
+    @state() accessor reviewedHash: string | null = null
+    @state() accessor hashMismatch = false
     @state() accessor tx = ''
     @state() accessor txParsed: ParsedTransactionInfo | null = null
     @state() accessor clearSigning: ClearSigningResult | null = null
@@ -66,7 +73,7 @@ export class ApproveUi extends BaseElement {
         const preview = new URLSearchParams(window.location.hash.slice(1))
         const previewTx = preview.get('preview')
         if (previewTx) {
-            this.showPreview(previewTx, preview.get('hash') ?? '')
+            void this.showPreview(previewTx, preview.get('hash') ?? '')
             return
         }
         const url = new URL(window.location.href)
@@ -123,6 +130,7 @@ export class ApproveUi extends BaseElement {
         this.externalTxId = result.externalTxId || null
         this.failureReason = result.failureReason || null
         this.describeTransaction()
+        await this.reviewHash(result.preparedTransactionHash)
 
         const wallets = await userClient.request({
             method: 'listWallets',
@@ -241,6 +249,14 @@ export class ApproveUi extends BaseElement {
     }
 
     private async handleSign() {
+        if (!this.reviewedHash) {
+            showToast(
+                'Cannot approve',
+                'The transaction shown does not match the hash that would be signed',
+                'error'
+            )
+            return
+        }
         if (!this.canSubmit) {
             showToast(
                 'Read-only wallet',
@@ -261,6 +277,7 @@ export class ApproveUi extends BaseElement {
                 params: {
                     transactionId: this.transactionId,
                     partyId: this.partyId,
+                    preparedTransactionHash: this.reviewedHash,
                 },
             })
 
@@ -334,7 +351,7 @@ export class ApproveUi extends BaseElement {
     }
 
     /** Shows how a prepared transaction would be presented for approval, without loading or signing it. */
-    private showPreview(tx: string, hash: string) {
+    private async showPreview(tx: string, hash: string) {
         this.previewNotice =
             'This is a preview, not a transaction to sign. Nothing is submitted.'
         this.commandId = 'preview'
@@ -343,6 +360,23 @@ export class ApproveUi extends BaseElement {
         this.tx = tx
         this.txHash = hash
         this.describeTransaction()
+        if (hash) {
+            await this.reviewHash(hash)
+        }
+    }
+
+    // The hash the gateway reports only selects the hashing scheme; what is shown and approved is the
+    // hash of the bytes on screen.
+    private async reviewHash(claimedHash: string) {
+        try {
+            this.reviewedHash =
+                (await hashForReview(this.tx, claimedHash)) ?? null
+        } catch (error) {
+            console.error('Error hashing prepared transaction:', error)
+            this.reviewedHash = null
+        }
+        this.hashMismatch = this.reviewedHash === null
+        this.txHash = this.reviewedHash ?? claimedHash
     }
 
     private describeTransaction() {
@@ -372,6 +406,14 @@ export class ApproveUi extends BaseElement {
                 this.previewNotice
                     ? html`<div class="alert alert-warning" role="alert">
                           ${this.previewNotice}
+                      </div>`
+                    : ''
+            }
+            ${
+                this.hashMismatch
+                    ? html`<div class="alert alert-danger" role="alert">
+                          The transaction shown does not match the hash that
+                          would be signed. Approval is disabled.
                       </div>`
                     : ''
             }
@@ -406,7 +448,7 @@ export class ApproveUi extends BaseElement {
                 .isDeleting=${this.isDeleting}
                 .isSigning=${this.isSigning}
                 .submitFailed=${!!this.failureReason}
-                .disabled=${this.disabled}
+                .disabled=${this.disabled || this.hashMismatch}
                 @transaction-approve=${this.handleApproveAction}
                 @transaction-delete=${this.handleReject}
             ></wg-transaction-detail>

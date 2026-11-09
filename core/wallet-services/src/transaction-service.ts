@@ -90,10 +90,39 @@ export class TransactionService {
         private clearSigningDescriptors: readonly Descriptor[] = shippedDescriptors()
     ) {}
 
+    /**
+     * Signs a transaction a user approved. `signParams.preparedTransactionHash` is the hash the user's
+     * client computed from the transaction it displayed; signing is refused unless it equals the hash
+     * of the stored transaction, so the user cannot be shown one transaction and sign another.
+     */
     public async sign(
         authContext: AuthContext,
         wallet: Wallet,
         signParams: SignParams
+    ): Promise<SignResult> {
+        const tx = await this.loadPreparedTransactionForSigning(
+            signParams.transactionId
+        )
+        const computed = await this.assertHashBinding(tx)
+        if (
+            !bytesEqual(
+                computed,
+                base64Bytes(signParams.preparedTransactionHash)
+            )
+        ) {
+            throw new Error(
+                `The approved hash of transaction '${tx.id}' does not match the transaction; refusing to sign`
+            )
+        }
+        this.logApproval(tx, authContext, wallet, 'user')
+        return this.signVerified(authContext, wallet, tx)
+    }
+
+    // Signs a transaction whose stored hash has been checked against its content.
+    private async signVerified(
+        authContext: AuthContext,
+        wallet: Wallet,
+        tx: Transaction
     ): Promise<SignResult> {
         const signingProvider = wallet.signingProviderId as SigningProvider
         const driver = this.signingDrivers[signingProvider]?.controller(
@@ -103,10 +132,6 @@ export class TransactionService {
             throw new Error(`No driver found for ${signingProvider}`)
         }
 
-        const tx = await this.loadPreparedTransactionForSigning(
-            signParams.transactionId
-        )
-        await this.assertHashBinding(tx)
         this.warnIfNotFullyDescribed(tx)
 
         const baseSignParams = {
@@ -216,10 +241,6 @@ export class TransactionService {
         transaction: Transaction
     ): Promise<SignAndExecuteResult> {
         const existing = await this.store.getTransaction(transaction.id)
-        const signParams: SignParams = {
-            transactionId: transaction.id,
-            partyId: wallet.partyId,
-        }
         if (!existing) {
             throw new Error(`Transaction not found with id ${transaction.id}`)
         }
@@ -245,7 +266,13 @@ export class TransactionService {
                 )
             }
         } else {
-            const signResult = await this.sign(authContext, wallet, signParams)
+            // A service account has no reviewer: the transaction is signed as prepared.
+            const tx = await this.loadPreparedTransactionForSigning(
+                transaction.id
+            )
+            await this.assertHashBinding(tx)
+            this.logApproval(tx, authContext, wallet, 'service account')
+            const signResult = await this.signVerified(authContext, wallet, tx)
             if (signResult.status === 'pending') return signResult
 
             if (signResult.status !== 'signed') {
@@ -490,7 +517,7 @@ export class TransactionService {
      * unchecked would sign whatever the participant chose, not the transaction the user approved, so
      * the hash is recomputed from the transaction bytes first.
      */
-    private async assertHashBinding(tx: Transaction): Promise<void> {
+    private async assertHashBinding(tx: Transaction): Promise<Uint8Array> {
         const computed = await computePreparedTransactionHash(
             tx.preparedTransaction,
             this.hashingSchemeVersion
@@ -500,6 +527,25 @@ export class TransactionService {
                 `Prepared transaction hash of transaction '${tx.id}' does not match its content; refusing to sign`
             )
         }
+        return computed
+    }
+
+    /** Records who approved signing which hash, before anything is sent to the signing provider. */
+    private logApproval(
+        tx: Transaction,
+        authContext: AuthContext,
+        wallet: Wallet,
+        approvedBy: 'user' | 'service account'
+    ): void {
+        this.logger.info('Transaction signing approved', {
+            transactionId: tx.id,
+            preparedTransactionHash: tx.preparedTransactionHash,
+            approvedBy,
+            userId: authContext.userId,
+            partyId: wallet.partyId,
+            signingProvider: wallet.signingProviderId,
+            approvedAt: new Date().toISOString(),
+        })
     }
 
     /**

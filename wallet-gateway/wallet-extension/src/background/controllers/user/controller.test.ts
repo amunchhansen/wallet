@@ -124,6 +124,7 @@ describe('userController transactions', () => {
     const params = {
         transactionId: pendingTransaction.id,
         partyId: wallet.partyId,
+        preparedTransactionHash,
     }
 
     let service: NotificationService

@@ -86,6 +86,7 @@ const executedTransaction: Transaction = {
 const signParams = {
     transactionId: pendingTransaction.id,
     partyId: wallet.partyId,
+    preparedTransactionHash: pendingTransaction.preparedTransactionHash,
 }
 
 const executeParams = {
@@ -329,6 +330,52 @@ describe('TransactionService', () => {
                 }
             )
 
+            it('refuses to sign when the user approved another hash', async () => {
+                const signTransaction = vi.fn()
+                const service = new TransactionService(
+                    createStore(),
+                    {
+                        [SigningProvider.WALLET_KERNEL]: createDriver({
+                            signTransaction,
+                        }),
+                    },
+                    notifier,
+                    'HASHING_SCHEME_VERSION_V3'
+                )
+
+                await expect(
+                    service.sign(authContext, wallet, {
+                        ...signParams,
+                        preparedTransactionHash: pingPreparedTransactionHashV3,
+                    })
+                ).rejects.toThrow('approved hash')
+                expect(signTransaction).not.toHaveBeenCalled()
+            })
+
+            it('logs the approval before signing', async () => {
+                const signTransaction = vi.fn().mockResolvedValue({
+                    status: 'signed',
+                    signature: 'approved-signature',
+                })
+                const service = new TransactionService(
+                    createStore(),
+                    {
+                        [SigningProvider.WALLET_KERNEL]: createDriver({
+                            signTransaction,
+                        }),
+                    },
+                    notifier,
+                    'HASHING_SCHEME_VERSION_V3'
+                )
+
+                await service.sign(authContext, wallet, signParams)
+
+                recorder.assertLogged({
+                    level: 'info',
+                    message: /Transaction signing approved/,
+                })
+            })
+
             it('signs a transaction the shipped descriptors do not cover', async () => {
                 const signTransaction = vi.fn().mockResolvedValue({
                     status: 'signed',
@@ -383,11 +430,10 @@ describe('TransactionService', () => {
                     'HASHING_SCHEME_VERSION_V3'
                 )
 
-                const result = await service.sign(
-                    authContext,
-                    wallet,
-                    signParams
-                )
+                const result = await service.sign(authContext, wallet, {
+                    ...signParams,
+                    preparedTransactionHash: pingPreparedTransactionHashV3,
+                })
 
                 expect(signTransaction).toHaveBeenCalledWith({
                     tx: pingPreparedTransactionV3,
@@ -1931,16 +1977,22 @@ describe('TransactionService', () => {
             )
 
             it('signs and executes when signing completes synchronously', async () => {
-                const service = createService(createStore(), {}, notifier)
+                const service = createService(
+                    createStore(),
+                    {
+                        [SigningProvider.PARTICIPANT]: createDriver({
+                            signTransaction: vi.fn().mockResolvedValue({
+                                status: 'signed',
+                                signature: 'none',
+                                signedBy: 'namespace',
+                            }),
+                        }),
+                    },
+                    notifier
+                )
                 const executeSpy = vi
                     .spyOn(service, 'execute')
                     .mockResolvedValue({ commandId: 'cmd-1' })
-                vi.spyOn(service, 'sign').mockResolvedValue({
-                    status: 'signed',
-                    signature: 'sig',
-                    signedBy: 'namespace',
-                    partyId: participantWallet.partyId,
-                })
 
                 const result = await service.signAndExecute(
                     authContext,
@@ -1951,28 +2003,40 @@ describe('TransactionService', () => {
 
                 expect(result).toEqual({ commandId: 'cmd-1' })
                 expect(executeSpy).toHaveBeenCalled()
+                // A service account has no reviewer; the approval is recorded as its own.
+                recorder.assertLogged({
+                    level: 'info',
+                    message: /Transaction signing approved/,
+                })
             })
 
             it('returns pending sign result without executing', async () => {
-                const service = createService(createStore(), {}, notifier)
-                const executeSpy = vi.spyOn(service, 'execute')
-                vi.spyOn(service, 'sign').mockResolvedValue({
+                const signTransaction = vi.fn().mockResolvedValue({
                     status: 'pending',
-                    externalTxId: 'ext-1',
-                    partyId: participantWallet.partyId,
+                    txId: 'bitgo-tx-1',
                 })
+                const service = createService(
+                    createStore(),
+                    {
+                        [SigningProvider.BITGO]: createDriver({
+                            signTransaction,
+                        }),
+                    },
+                    notifier
+                )
+                const executeSpy = vi.spyOn(service, 'execute')
 
                 const result = await service.signAndExecute(
                     authContext,
                     network,
-                    participantWallet,
+                    walletWithProvider(SigningProvider.BITGO),
                     pendingTransaction
                 )
 
                 expect(result).toEqual({
                     status: 'pending',
-                    externalTxId: 'ext-1',
-                    partyId: participantWallet.partyId,
+                    externalTxId: 'bitgo-tx-1',
+                    partyId: wallet.partyId,
                 })
                 expect(executeSpy).not.toHaveBeenCalled()
             })

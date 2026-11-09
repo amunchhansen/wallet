@@ -271,6 +271,12 @@ export interface WalletFilter {
 export type TransactionId = string
 /**
  *
+ * The hash of the prepared transaction.
+ *
+ */
+export type PreparedTransactionHash = string
+/**
+ *
  * Limit of transactions to return.
  *
  */
@@ -575,12 +581,6 @@ export type CommandId = string
 export type PreparedTransaction = string
 /**
  *
- * The hash of the prepared transaction.
- *
- */
-export type PreparedTransactionHash = string
-/**
- *
  * Optional payload associated with the transaction.
  *
  */
@@ -765,6 +765,7 @@ export interface ListWalletsParams {
 export interface SignParams {
     transactionId: TransactionId
     partyId: PartyId
+    preparedTransactionHash: PreparedTransactionHash
 }
 export interface SignMessageParams {
     messageId: MessageId

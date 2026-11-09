@@ -1726,6 +1726,7 @@ describe('userController', () => {
                 controller.sign({
                     transactionId: 'tx-1',
                     partyId: primaryWallet.partyId,
+                    preparedTransactionHash: 'hash',
                 })
             ).rejects.toThrow('No session found')
         })
@@ -1755,6 +1756,7 @@ describe('userController', () => {
             const signParams = {
                 transactionId: 'tx-1',
                 partyId: participantWallet.partyId,
+                preparedTransactionHash: 'hash',
             }
             const result = await controller.sign(signParams)
 

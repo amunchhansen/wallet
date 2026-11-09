@@ -8,6 +8,7 @@ import {
     handleErrorToast,
 } from '@canton-network/core-wallet-ui-components'
 import {
+    hashForReview,
     type ParsedTransactionInfo,
     parsePreparedTransaction,
 } from '@canton-network/core-tx-visualizer'
@@ -37,6 +38,8 @@ export class ApproveUi extends BaseElement {
     @state() accessor commandId = ''
     @state() accessor partyId = ''
     @state() accessor txHash = ''
+    /** The hash computed here from the transaction on screen, sent with the approval. */
+    @state() accessor reviewedHash: string | null = null
     @state() accessor tx = ''
     @state() accessor txParsed: ParsedTransactionInfo | null = null
     @state() accessor status = ''
@@ -166,6 +169,28 @@ export class ApproveUi extends BaseElement {
                     'This transaction could not be decoded and cannot be approved safely.'
             }
 
+            // The gateway's hash only selects the hashing scheme; what is approved is the hash of
+            // the bytes on screen, and the gateway signs only if its transaction has that hash.
+            try {
+                this.reviewedHash =
+                    (await hashForReview(
+                        this.tx,
+                        transaction.preparedTransactionHash
+                    )) ?? null
+            } catch (error) {
+                logger.error('Failed to hash prepared transaction: {*}', {
+                    error,
+                    transactionId: this.transactionId,
+                })
+                this.reviewedHash = null
+            }
+            if (this.reviewedHash === null) {
+                this.errorMessage ??=
+                    'The transaction shown does not match the hash that would be signed. It cannot be approved.'
+            } else {
+                this.txHash = this.reviewedHash
+            }
+
             // a signed transaction whose submission was not confirmed can be submitted again
             if (
                 transaction.status !== 'pending' &&
@@ -256,6 +281,7 @@ export class ApproveUi extends BaseElement {
                           params: {
                               transactionId: this.transactionId,
                               partyId: this.partyId,
+                              preparedTransactionHash: this.reviewedHash ?? '',
                           },
                       })
 

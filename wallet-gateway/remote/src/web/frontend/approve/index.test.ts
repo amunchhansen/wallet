@@ -15,7 +15,7 @@ import {
     makeWallet,
     mockRequest,
 } from '../__tests__/test-helpers.js'
-import { pingCreate } from '../__tests__/ping-transaction.js'
+import { pingCreate, pingCreateHash } from '../__tests__/ping-transaction.js'
 
 const {
     mockCreateUserClient,
@@ -143,10 +143,9 @@ describe('UserUiApprove', () => {
 
         it('loads transaction details from the URL and renders the detail view', () => {
             expect(el.transactionId).toBe('tx-1')
-            expect(el.txHash).toBe('hash-abc')
-            expect(parsePreparedTransaction).toHaveBeenCalledWith(
-                'prepared-tx-blob'
-            )
+            expect(el.txHash).toBe(pingCreateHash)
+            expect(el.reviewedHash).toBe(pingCreateHash)
+            expect(parsePreparedTransaction).toHaveBeenCalledWith(pingCreate)
             expect(
                 el.shadowRoot?.querySelector('wg-transaction-detail')
             ).not.toBeNull()
@@ -170,6 +169,15 @@ describe('UserUiApprove', () => {
                 { timeout: 3000 }
             )
 
+            // The approval carries the hash computed here from the transaction on screen.
+            expect(mockRequest).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    method: 'sign',
+                    params: expect.objectContaining({
+                        preparedTransactionHash: pingCreateHash,
+                    }),
+                })
+            )
             expect(showToast).toHaveBeenCalledWith(
                 '',
                 'Activity executed successfully',
@@ -210,6 +218,30 @@ describe('UserUiApprove', () => {
             expect(setLocationHref).toHaveBeenCalledWith(
                 expect.stringContaining('/activities')
             )
+        })
+    })
+
+    describe('hash binding', () => {
+        it('disables approval when the transaction does not match its hash', async () => {
+            mockApproveState(
+                makeTransaction({
+                    preparedTransactionHash: btoa('x'.repeat(32)),
+                })
+            )
+            el = await fixture<ApproveUi>(componentFixture)
+            await waitUntil(() => el.hashMismatch, 'hash checked')
+
+            expect(el.reviewedHash).toBeNull()
+            expect(
+                el.shadowRoot?.querySelector('.alert-danger')?.textContent
+            ).toContain('does not match the hash')
+            const detail = el.shadowRoot?.querySelector(
+                'wg-transaction-detail'
+            ) as (HTMLElement & { updateComplete: Promise<unknown> }) | null
+            await detail?.updateComplete
+            expect(
+                detail?.shadowRoot?.querySelector('button.btn-primary')
+            ).toHaveProperty('disabled', true)
         })
     })
 
@@ -299,14 +331,14 @@ describe('UserUiApprove', () => {
             history.replaceState(
                 {},
                 '',
-                `#preview=${encodeURIComponent(pingCreate)}&hash=hash-abc`
+                `#preview=${encodeURIComponent(pingCreate)}&hash=${encodeURIComponent(pingCreateHash)}`
             )
             el = await fixture<ApproveUi>(componentFixture)
             await waitUntil(() => el.clearSigning !== null, 'preview described')
 
             expect(el.status).toBe('preview')
             expect(el.disabled).toBe(true)
-            expect(el.txHash).toBe('hash-abc')
+            expect(el.txHash).toBe(pingCreateHash)
             expect(el.clearSigning?.complete).toBe(true)
             expect(mockRequest).not.toHaveBeenCalled()
             expect(
