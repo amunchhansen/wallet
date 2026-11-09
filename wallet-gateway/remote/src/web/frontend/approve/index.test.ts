@@ -290,6 +290,31 @@ describe('UserUiApprove', () => {
         })
     })
 
+    describe('preview', () => {
+        afterEach(() => {
+            history.replaceState({}, '', window.location.pathname)
+        })
+
+        it('describes a transaction from the fragment without loading one', async () => {
+            history.replaceState(
+                {},
+                '',
+                `#preview=${encodeURIComponent(pingCreate)}&hash=hash-abc`
+            )
+            el = await fixture<ApproveUi>(componentFixture)
+            await waitUntil(() => el.clearSigning !== null, 'preview described')
+
+            expect(el.status).toBe('preview')
+            expect(el.disabled).toBe(true)
+            expect(el.txHash).toBe('hash-abc')
+            expect(el.clearSigning?.complete).toBe(true)
+            expect(mockRequest).not.toHaveBeenCalled()
+            expect(
+                el.shadowRoot?.querySelector('.alert-warning')?.textContent
+            ).toContain('not a transaction to sign')
+        })
+    })
+
     describe('with closeafteraction in the URL', () => {
         beforeEach(async () => {
             history.replaceState({}, '', '?transactionId=tx-1&closeafteraction')

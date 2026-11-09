@@ -8,7 +8,8 @@ import {
     decryptString,
 } from './access-token-utils.js'
 
-const VERSION_PREFIX = 'com.splice.wallet.v1'
+/** Every localStorage key of this app starts with this prefix; other keys are deleted on load. */
+export const VERSION_PREFIX = 'com.splice.wallet.v1'
 
 export class StateManager {
     static localStorageKey(item: string, origin: string): string {

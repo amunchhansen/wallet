@@ -15,8 +15,8 @@ import {
 import {
     clearSign,
     type ClearSigningResult,
-    shippedDescriptors,
 } from '@canton-network/core-tx-clear-signing'
+import { activeDescriptors } from '../descriptors-store.js'
 import { createUserClient } from '../rpc-client'
 import { setLocationHref } from '../navigation.js'
 import { stateManager } from '../state-manager'
@@ -45,6 +45,7 @@ export class ApproveUi extends BaseElement {
     @state() accessor txParsed: ParsedTransactionInfo | null = null
     @state() accessor clearSigning: ClearSigningResult | null = null
     @state() accessor clearSigningError: string | null = null
+    @state() accessor previewNotice: string | null = null
     @state() accessor status = ''
     @state() accessor createdAt: string | null = null
     @state() accessor signedAt: string | null = null
@@ -61,6 +62,13 @@ export class ApproveUi extends BaseElement {
 
     connectedCallback(): void {
         super.connectedCallback()
+        // A transaction to preview travels in the fragment, which never reaches the server.
+        const preview = new URLSearchParams(window.location.hash.slice(1))
+        const previewTx = preview.get('preview')
+        if (previewTx) {
+            this.showPreview(previewTx, preview.get('hash') ?? '')
+            return
+        }
         const url = new URL(window.location.href)
         this.transactionId = url.searchParams.get('transactionId') || ''
         this.pollDelay = POLL_INTERVAL_MS
@@ -114,24 +122,7 @@ export class ApproveUi extends BaseElement {
         this.origin = result.origin || null
         this.externalTxId = result.externalTxId || null
         this.failureReason = result.failureReason || null
-
-        try {
-            this.txParsed = parsePreparedTransaction(this.tx)
-        } catch (error) {
-            console.error('Error parsing prepared transaction:', error)
-            this.txParsed = null
-        }
-
-        try {
-            this.clearSigning = clearSign(this.tx, shippedDescriptors())
-            this.clearSigningError = null
-        } catch (error) {
-            // A malformed transaction: the detail view shows why, and approval stays the user's call.
-            console.error('Error describing prepared transaction:', error)
-            this.clearSigning = null
-            this.clearSigningError =
-                error instanceof Error ? error.message : String(error)
-        }
+        this.describeTransaction()
 
         const wallets = await userClient.request({
             method: 'listWallets',
@@ -342,8 +333,48 @@ export class ApproveUi extends BaseElement {
         }
     }
 
+    /** Shows how a prepared transaction would be presented for approval, without loading or signing it. */
+    private showPreview(tx: string, hash: string) {
+        this.previewNotice =
+            'This is a preview, not a transaction to sign. Nothing is submitted.'
+        this.commandId = 'preview'
+        this.status = 'preview'
+        this.disabled = true
+        this.tx = tx
+        this.txHash = hash
+        this.describeTransaction()
+    }
+
+    private describeTransaction() {
+        try {
+            this.txParsed = parsePreparedTransaction(this.tx)
+        } catch (error) {
+            console.error('Error parsing prepared transaction:', error)
+            this.txParsed = null
+        }
+
+        try {
+            const descriptors = activeDescriptors().map((a) => a.descriptor)
+            this.clearSigning = clearSign(this.tx, descriptors)
+            this.clearSigningError = null
+        } catch (error) {
+            // A malformed transaction: the detail view shows why, and approval stays the user's call.
+            console.error('Error describing prepared transaction:', error)
+            this.clearSigning = null
+            this.clearSigningError =
+                error instanceof Error ? error.message : String(error)
+        }
+    }
+
     protected render() {
         return html`
+            ${
+                this.previewNotice
+                    ? html`<div class="alert alert-warning" role="alert">
+                          ${this.previewNotice}
+                      </div>`
+                    : ''
+            }
             ${
                 this.walletCapabilityMessage
                     ? html`<div class="alert alert-warning" role="alert">

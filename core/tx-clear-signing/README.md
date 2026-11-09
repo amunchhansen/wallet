@@ -21,7 +21,7 @@ const { complete, operations } = clearSign(preparedTransaction, [
 ])
 ```
 
-- `shippedDescriptors` returns the descriptors bundled with this build: the builtin Canton ping and bong templates (`Canton.Internal.Ping:Ping`, `Canton.Internal.Bong:BongProposal`, `Explode`, `Merge`, `Collapse`, `Bong`), and `AllocationFactory_Allocate` on `Splice.ExternalPartyAmuletRules:ExternalPartyAmuletRules`. The descriptor list is where a registry or a trust policy would plug in: today the approve page and `TransactionService` both pass the shipped set.
+- `shippedDescriptors` returns the descriptors bundled with this build: the builtin Canton ping and bong templates (`Canton.Internal.Ping:Ping`, `Canton.Internal.Bong:BongProposal`, `Explode`, `Merge`, `Collapse`, `Bong`), and `AllocationFactory_Allocate` on `Splice.ExternalPartyAmuletRules:ExternalPartyAmuletRules`. The descriptor list is where a registry or a trust policy would plug in: `TransactionService` passes the shipped set. The wallet gateway's approve page also passes descriptors uploaded on its Descriptors page, which are stored in that browser only and replace a shipped descriptor for the same template.
 - `parseDescriptor` validates descriptor JSON against the schema and then checks the rules a JSON Schema cannot express: an operation declares each path once, placeholders name declared fields, and enum references exist. It throws `DescriptorError`. `$schema` must be `https://example.org/canton-clear-signing/v1/schema.json`, the schema's `$id`. That URL is a placeholder until a host is chosen.
 - `clearSign` takes the transaction as base64, so unknown protobuf fields are refused, and returns one `OperationDescription` per root node:
     - `described`: the interpolated intent rendered;

@@ -98,6 +98,7 @@ export const ToggleMenu: Story = {
             'Activities',
             'Networks',
             'API Keys',
+            'Descriptors',
             'Identity Providers',
         ]) {
             await expect(await menuItem(canvasElement, name)).toBeVisible()

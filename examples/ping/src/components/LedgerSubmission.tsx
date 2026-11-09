@@ -19,6 +19,7 @@ import { useTransactions } from '../hooks/useTransactions'
 import { parsePreparedTransaction } from '@canton-network/core-tx-visualizer'
 
 import * as sdk from '@canton-network/dapp-sdk'
+import { popup } from '@canton-network/core-wallet-ui-components'
 import { prettyjson } from '../utils'
 
 export function LedgerSubmission(props: {
@@ -28,6 +29,7 @@ export function LedgerSubmission(props: {
 }) {
     const { setErrorMsg } = useContext(ErrorContext)
     const [loading, setLoading] = useState(false)
+    const [previewInput, setPreviewInput] = useState('')
 
     const transactions = useTransactions(props.connectResult)
     const connected = props.connectResult?.isConnected ?? false
@@ -43,6 +45,48 @@ export function LedgerSubmission(props: {
             .catch((err) => {
                 console.error('Error creating ping contract:', err)
                 setLoading(false)
+                setErrorMsg(
+                    err instanceof Error ? err.message : JSON.stringify(err)
+                )
+            })
+    }
+
+    // Accepts the JSON response of /v2/interactive-submission/prepare, or the bare base64
+    // preparedTransaction, and opens the wallet's approve page on it in preview mode.
+    function openApprovePreview() {
+        setErrorMsg('')
+        const input = previewInput.trim()
+        let tx = input
+        let hash = ''
+        if (input.startsWith('{')) {
+            try {
+                const response = JSON.parse(input) as {
+                    preparedTransaction?: string
+                    preparedTransactionHash?: string
+                }
+                tx = response.preparedTransaction ?? ''
+                hash = response.preparedTransactionHash ?? ''
+            } catch {
+                setErrorMsg('The prepare response is not valid JSON.')
+                return
+            }
+        }
+        if (!tx) {
+            setErrorMsg('No preparedTransaction to preview.')
+            return
+        }
+        sdk.status()
+            .then((status) => {
+                const userUrl = status.provider.userUrl
+                if (!userUrl) {
+                    setErrorMsg('The wallet did not report its address.')
+                    return
+                }
+                const base = userUrl.replace(/\/login\/?$/, '')
+                const fragment = new URLSearchParams({ preview: tx, hash })
+                popup.open(`${base}/approve/index.html#${fragment}`)
+            })
+            .catch((err) => {
                 setErrorMsg(
                     err instanceof Error ? err.message : JSON.stringify(err)
                 )
@@ -377,6 +421,18 @@ export function LedgerSubmission(props: {
                     onClick={createPingContractAndWait}
                 >
                     create Ping contract and wait
+                </button>
+                <textarea
+                    rows={3}
+                    placeholder="Prepare response JSON or base64 preparedTransaction"
+                    value={previewInput}
+                    onChange={(e) => setPreviewInput(e.target.value)}
+                />
+                <button
+                    disabled={!connected || !previewInput.trim()}
+                    onClick={openApprovePreview}
+                >
+                    preview on approve page
                 </button>
                 <button
                     disabled={!props.primaryParty || loading}
