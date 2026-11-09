@@ -66,6 +66,8 @@ export interface Resolved {
      * be `None`. A mistyped path looks the same, so the caller shows that the value was inferred.
      */
     absentField?: string
+    /** True when the path names an Optional that holds a value; `value` is that value. */
+    some?: true
 }
 
 const NONE: Value = { sum: { oneofKind: 'optional', optional: {} } }
@@ -89,7 +91,8 @@ export function resolvePath(root: Value, steps: Step[]): Resolved {
         }
         current = applyStep(v, step, i === steps.length - 1)
     }
-    return { value: unwrapSome(current) }
+    const value = unwrapSome(current)
+    return value === current ? { value } : { value, some: true }
 }
 
 function lacksField(v: Value, name: string): boolean {

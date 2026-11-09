@@ -8,14 +8,14 @@
         }
     },
     "metadata": {
-        "version": "1.0.0",
+        "version": "1.1.0",
         "publisher": "<splice publisher>",
         "name": "Governance lock substitution"
     },
     "display": {
         "create": {
             "intent": "Propose a governance lock substitution",
-            "interpolatedIntent": "Propose substituting {amount} of the governance lock of {target.owner}, proposed by {owner}",
+            "interpolatedIntent": "Propose substituting {amount} of the {target.specification} of {target.owner}, proposed by {owner}",
             "fields": [
                 {
                     "path": "amount",
@@ -34,28 +34,101 @@
                 },
                 {
                     "path": "target.specification",
-                    "label": "Lock",
-                    "format": "raw"
-                },
-                {
-                    "path": "target.specification.GLS_VestingLock.kind.GLK_FeaturedApp.provider",
-                    "label": "Featured app provider",
-                    "format": "party"
-                },
-                {
-                    "path": "target.specification.GLS_VestingLock.vestingPeriod",
-                    "label": "Vesting period",
-                    "format": "duration"
-                },
-                {
-                    "path": "target.specification.GLS_VestingLock.endTime",
-                    "label": "Vesting ends",
-                    "format": "dateTime"
-                },
-                {
-                    "path": "target.specification.GLS_FullLock.kind.GLK_SuperValidatorRightsOwner.svName",
-                    "label": "SV",
-                    "format": "string"
+                    "label": "Lock type",
+                    "cases": {
+                        "GLS_VestingLock": {
+                            "label": "vesting lock",
+                            "fields": [
+                                {
+                                    "path": "kind",
+                                    "label": "Lock for",
+                                    "cases": {
+                                        "GLK_FeaturedApp": {
+                                            "label": "featured app",
+                                            "fields": [
+                                                {
+                                                    "path": "provider",
+                                                    "label": "Provider",
+                                                    "format": "party"
+                                                }
+                                            ]
+                                        },
+                                        "GLK_ProvisionalFeaturedApp": {
+                                            "label": "provisional featured app",
+                                            "fields": [
+                                                {
+                                                    "path": "provider",
+                                                    "label": "Provider",
+                                                    "format": "party"
+                                                }
+                                            ]
+                                        },
+                                        "GLK_SuperValidatorRightsOwner": {
+                                            "label": "super validator",
+                                            "fields": [
+                                                {
+                                                    "path": "svName",
+                                                    "label": "SV",
+                                                    "format": "string"
+                                                }
+                                            ]
+                                        }
+                                    }
+                                },
+                                {
+                                    "path": "vestingPeriod",
+                                    "label": "Vesting period",
+                                    "format": "duration"
+                                },
+                                {
+                                    "path": "endTime",
+                                    "label": "Vesting ends",
+                                    "format": "dateTime"
+                                }
+                            ]
+                        },
+                        "GLS_FullLock": {
+                            "label": "full lock",
+                            "fields": [
+                                {
+                                    "path": "kind",
+                                    "label": "Lock for",
+                                    "cases": {
+                                        "GLK_FeaturedApp": {
+                                            "label": "featured app",
+                                            "fields": [
+                                                {
+                                                    "path": "provider",
+                                                    "label": "Provider",
+                                                    "format": "party"
+                                                }
+                                            ]
+                                        },
+                                        "GLK_ProvisionalFeaturedApp": {
+                                            "label": "provisional featured app",
+                                            "fields": [
+                                                {
+                                                    "path": "provider",
+                                                    "label": "Provider",
+                                                    "format": "party"
+                                                }
+                                            ]
+                                        },
+                                        "GLK_SuperValidatorRightsOwner": {
+                                            "label": "super validator",
+                                            "fields": [
+                                                {
+                                                    "path": "svName",
+                                                    "label": "SV",
+                                                    "format": "string"
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
                 },
                 {
                     "path": "lockedAmulet",
@@ -77,7 +150,7 @@
         "exercises": {
             "TransferInstruction_Accept": {
                 "intent": "Accept a governance lock substitution",
-                "interpolatedIntent": "Accept the substitution of {@.contract.amount} of the governance lock of {@.contract.target.owner}, proposed by {@.contract.owner}",
+                "interpolatedIntent": "Accept the substitution of {@.contract.amount} of the {@.contract.target.specification} of {@.contract.target.owner}, proposed by {@.contract.owner}",
                 "fields": [
                     {
                         "path": "actors",

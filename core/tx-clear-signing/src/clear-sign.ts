@@ -9,6 +9,7 @@ import type { Descriptor, Field, Format, Operation } from './descriptor.js'
 import { formatValue, type EnumTables } from './format.js'
 import { CONTRACT_PREFIX, parseIntent } from './intent.js'
 import {
+    describeKind,
     isNone,
     parsePath,
     PathError,
@@ -39,6 +40,13 @@ export interface DescribedField {
      * path looks like, so the wallet shows that the value was inferred.
      */
     absent?: true
+    /**
+     * For a field with cases: the shape of its value (a variant constructor, `Some` or `None`). `value`
+     * is that case's label, or this name when the descriptor gives none.
+     */
+    case?: string
+    /** The fields of the matched case, resolved against the value the case matched. */
+    fields?: DescribedField[]
 }
 
 /**
@@ -125,11 +133,15 @@ export function clearSign(
         describeNode(prepared, node, byTemplate)
     )
     const complete = operations.every(
-        (op) =>
-            op.status === 'described' &&
-            op.fields.every((f) => f.error === undefined)
+        (op) => op.status === 'described' && op.fields.every(resolvedFully)
     )
     return { complete, operations }
+}
+
+function resolvedFully(field: DescribedField): boolean {
+    return (
+        field.error === undefined && (field.fields ?? []).every(resolvedFully)
+    )
 }
 
 function indexByTemplate(
@@ -261,13 +273,32 @@ function describeField(
 ): DescribedField {
     const label = field.label ?? field.path
     try {
-        const { value, absentField } = resolveField(field, argument)
+        const resolved = resolveField(field, argument)
+        const absent = resolved.absentField !== undefined && {
+            absent: true as const,
+        }
+        if (field.cases) {
+            const shape = shapeOf(resolved)
+            const matched = field.cases[shape.name]
+            return {
+                label,
+                path: field.path,
+                value: matched?.label ?? shape.name,
+                case: shape.name,
+                ...(matched?.fields && {
+                    fields: matched.fields.map((f) =>
+                        describeField(f, shape.payload, enums)
+                    ),
+                }),
+                ...absent,
+            }
+        }
         return {
             label,
             path: field.path,
-            value: format(value, field, enums),
+            value: format(resolved.value, field, enums),
             ...declaredFormat(field),
-            ...(absentField !== undefined && { absent: true }),
+            ...absent,
         }
     } catch (err) {
         return {
@@ -279,13 +310,23 @@ function describeField(
     }
 }
 
-// A None fails the placeholder, so the sentence never depends on an absent value.
+// A None fails the placeholder, so the sentence never depends on an absent value. A field with
+// cases puts the matched case's label in the sentence, and fails when the case has none.
 function valuePart(path: string, selected: Selected): IntentPart {
     const field = fieldFor(path, selected)
     const argument = path.startsWith(CONTRACT_PREFIX)
         ? selected.contract
         : selected.argument
-    const { value: resolved } = resolveField(field, argument)
+    const { value: resolved, ...shape } = resolveField(field, argument)
+    if (field.cases) {
+        // Only a label the descriptor gives for the case is used in the sentence
+        const name = shapeOf({ value: resolved, ...shape }).name
+        const caseLabel = field.cases[name]?.label
+        if (caseLabel === undefined) {
+            throw new PathError(`'${path}' has no case label for '${name}'`)
+        }
+        return { kind: 'value', path, value: caseLabel }
+    }
     if (isNone(resolved)) {
         throw new PathError(`'${path}' is None`)
     }
@@ -310,6 +351,23 @@ function fieldFor(path: string, selected: Selected): Field {
         throw new PathError(`no field '${fieldPath}'`)
     }
     return field
+}
+
+// The shape a field with cases is matched on, and the value its case fields start at. Some is
+// unwrapped first, so an Optional holding a variant is matched by the variant's constructor.
+function shapeOf(resolved: Resolved): { name: string; payload?: Value } {
+    const { value } = resolved
+    const sum = value.sum
+    if (isNone(value)) return { name: 'None' }
+    if (sum.oneofKind === 'variant') {
+        return {
+            name: sum.variant.constructor,
+            ...(sum.variant.value && { payload: sum.variant.value }),
+        }
+    }
+    if (sum.oneofKind === 'enum') return { name: sum.enum.constructor }
+    if (resolved.some) return { name: 'Some', payload: value }
+    throw new PathError(`cases applied to ${describeKind(value)}`)
 }
 
 function declaredFormat(field: Field): { format: Format } | undefined {

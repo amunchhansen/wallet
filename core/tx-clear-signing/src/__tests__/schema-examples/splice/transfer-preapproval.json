@@ -8,7 +8,7 @@
         }
     },
     "metadata": {
-        "version": "1.0.0",
+        "version": "1.1.0",
         "publisher": "<splice publisher>",
         "name": "Transfer preapproval"
     },
@@ -55,9 +55,23 @@
                         "format": "string"
                     },
                     {
-                        "path": "meta.values[\"splice.lfdecentralizedtrust.org/reason\"]",
-                        "label": "Memo",
-                        "format": "string"
+                        "path": "meta",
+                        "label": "Metadata",
+                        "cases": {
+                            "Some": {
+                                "label": "given",
+                                "fields": [
+                                    {
+                                        "path": "values[\"splice.lfdecentralizedtrust.org/reason\"]",
+                                        "label": "Memo",
+                                        "format": "string"
+                                    }
+                                ]
+                            },
+                            "None": {
+                                "label": "none"
+                            }
+                        }
                     },
                     {
                         "path": "inputs.length",

@@ -8,7 +8,7 @@
         }
     },
     "metadata": {
-        "version": "1.0.0",
+        "version": "1.2.0",
         "publisher": "<splice publisher>",
         "name": "DSO rules",
         "enums": {
@@ -22,7 +22,7 @@
         "exercises": {
             "DsoRules_RequestVote": {
                 "intent": "Request a DSO vote",
-                "interpolatedIntent": "Request a vote by {requester}: {reason.body}",
+                "interpolatedIntent": "Request a vote by {requester} on {action}: {reason.body}",
                 "fields": [
                     {
                         "path": "requester",
@@ -51,71 +51,192 @@
                     },
                     {
                         "path": "action",
-                        "label": "Action",
-                        "format": "raw"
-                    },
-                    {
-                        "path": "action.ARC_DsoRules.dsoAction.SRARC_SetConfig.newConfig.maxTextLength",
-                        "label": "New max text length",
-                        "format": "number"
-                    },
-                    {
-                        "path": "action.ARC_DsoRules.dsoAction.SRARC_SetConfig.baseConfig.maxTextLength",
-                        "label": "Current max text length",
-                        "format": "number"
-                    },
-                    {
-                        "path": "action.ARC_DsoRules.dsoAction.SRARC_SetConfig.newConfig.voteCooldownTime",
-                        "label": "New vote cooldown",
-                        "format": "duration"
-                    },
-                    {
-                        "path": "action.ARC_DsoRules.dsoAction.SRARC_SetConfig.newConfig.svOperationsSwitchOverTimes[\"cip-0104\"]",
-                        "label": "CIP-0104 switch-over",
-                        "format": "dateTime"
-                    },
-                    {
-                        "path": "action.ARC_DsoRules.dsoAction.SRARC_SetConfig.newConfig.decentralizedSynchronizer.synchronizers",
-                        "label": "Synchronizers",
-                        "format": "raw"
-                    },
-                    {
-                        "path": "action.ARC_AmuletRules.amuletRulesAction.CRARC_AddFutureAmuletConfigSchedule.newScheduleItem._1",
-                        "label": "Schedule from",
-                        "format": "dateTime"
-                    },
-                    {
-                        "path": "action.ARC_AmuletRules.amuletRulesAction.CRARC_AddFutureAmuletConfigSchedule.newScheduleItem._2.decentralizedSynchronizer.fees.extraTrafficPrice",
-                        "label": "Extra traffic price",
-                        "format": "number"
-                    },
-                    {
-                        "path": "action.ARC_AmuletRules.amuletRulesAction.CRARC_AddFutureAmuletConfigSchedule.newScheduleItem._2.decentralizedSynchronizer.fees.baseRateTrafficLimits.burstWindow",
-                        "label": "Burst window",
-                        "format": "duration"
-                    },
-                    {
-                        "path": "action.ARC_AmuletRules.amuletRulesAction.CRARC_AddFutureAmuletConfigSchedule.newScheduleItem._2.decentralizedSynchronizer.requiredSynchronizers",
-                        "label": "Required synchronizers",
-                        "format": "raw"
-                    },
-                    {
-                        "path": "action.ARC_AmuletRules.amuletRulesAction.CRARC_AddFutureAmuletConfigSchedule.newScheduleItem._2.transferConfig.transferFee.steps",
-                        "label": "Transfer fee steps",
-                        "format": "raw"
-                    },
-                    {
-                        "path": "action.ARC_AmuletRules.amuletRulesAction.CRARC_AddFutureAmuletConfigSchedule.newScheduleItem._2.rewardConfig.mintingVersion",
-                        "label": "Minting",
-                        "format": "enum",
-                        "params": {
-                            "$ref": "$.metadata.enums.rewardVersion"
+                        "label": "Votes on",
+                        "cases": {
+                            "ARC_DsoRules": {
+                                "label": "the DSO rules",
+                                "fields": [
+                                    {
+                                        "path": "dsoAction",
+                                        "label": "Action",
+                                        "cases": {
+                                            "SRARC_AddSv": {
+                                                "label": "add an SV"
+                                            },
+                                            "SRARC_OffboardSv": {
+                                                "label": "offboard an SV"
+                                            },
+                                            "SRARC_ConfirmSvOnboarding": {
+                                                "label": "confirm an SV onboarding"
+                                            },
+                                            "SRARC_GrantFeaturedAppRight": {
+                                                "label": "grant a featured app right"
+                                            },
+                                            "SRARC_RevokeFeaturedAppRight": {
+                                                "label": "revoke a featured app right"
+                                            },
+                                            "SRARC_UpdateSvRewardWeight": {
+                                                "label": "change an SV reward weight"
+                                            },
+                                            "SRARC_CreateExternalPartyAmuletRules": {
+                                                "label": "create the amulet rules for external parties"
+                                            },
+                                            "SRARC_CreateTransferCommandCounter": {
+                                                "label": "create a transfer command counter"
+                                            },
+                                            "SRARC_CreateUnallocatedUnclaimedActivityRecord": {
+                                                "label": "create an unallocated unclaimed activity record"
+                                            },
+                                            "SRARC_CreateBootstrapExternalPartyConfigStateInstruction": {
+                                                "label": "bootstrap the external party config state"
+                                            },
+                                            "SRARC_UpdateFeaturedAppRight": {
+                                                "label": "update a featured app right"
+                                            },
+                                            "SRARC_CreateFeaturedAppConfigUpdateInstruction": {
+                                                "label": "update featured app configurations"
+                                            },
+                                            "SRARC_SetConfig": {
+                                                "label": "change the DSO rules configuration",
+                                                "fields": [
+                                                    {
+                                                        "path": "newConfig.maxTextLength",
+                                                        "label": "New max text length",
+                                                        "format": "number"
+                                                    },
+                                                    {
+                                                        "path": "baseConfig",
+                                                        "label": "Current configuration",
+                                                        "cases": {
+                                                            "Some": {
+                                                                "label": "set",
+                                                                "fields": [
+                                                                    {
+                                                                        "path": "maxTextLength",
+                                                                        "label": "Max text length",
+                                                                        "format": "number"
+                                                                    }
+                                                                ]
+                                                            },
+                                                            "None": {
+                                                                "label": "not given"
+                                                            }
+                                                        }
+                                                    },
+                                                    {
+                                                        "path": "newConfig.voteCooldownTime",
+                                                        "label": "New vote cooldown",
+                                                        "format": "duration"
+                                                    },
+                                                    {
+                                                        "path": "newConfig.svOperationsSwitchOverTimes[\"cip-0104\"]",
+                                                        "label": "CIP-0104 switch-over",
+                                                        "format": "dateTime"
+                                                    },
+                                                    {
+                                                        "path": "newConfig.decentralizedSynchronizer.synchronizers",
+                                                        "label": "Synchronizers",
+                                                        "format": "raw"
+                                                    }
+                                                ]
+                                            }
+                                        }
+                                    }
+                                ]
+                            },
+                            "ARC_AmuletRules": {
+                                "label": "the amulet rules",
+                                "fields": [
+                                    {
+                                        "path": "amuletRulesAction",
+                                        "label": "Action",
+                                        "cases": {
+                                            "CRARC_MiningRound_StartIssuing": {
+                                                "label": "start issuing a mining round"
+                                            },
+                                            "CRARC_MiningRound_Archive": {
+                                                "label": "archive a mining round"
+                                            },
+                                            "CRARC_RemoveFutureAmuletConfigSchedule": {
+                                                "label": "remove a scheduled amulet configuration"
+                                            },
+                                            "CRARC_UpdateFutureAmuletConfigSchedule": {
+                                                "label": "change a scheduled amulet configuration"
+                                            },
+                                            "CRARC_SetConfig": {
+                                                "label": "change the amulet configuration"
+                                            },
+                                            "CRARC_StartProcessingRewardsV2": {
+                                                "label": "start processing rewards"
+                                            },
+                                            "CRARC_AddFutureAmuletConfigSchedule": {
+                                                "label": "schedule an amulet configuration",
+                                                "fields": [
+                                                    {
+                                                        "path": "newScheduleItem._1",
+                                                        "label": "Schedule from",
+                                                        "format": "dateTime"
+                                                    },
+                                                    {
+                                                        "path": "newScheduleItem._2.decentralizedSynchronizer.fees.extraTrafficPrice",
+                                                        "label": "Extra traffic price",
+                                                        "format": "number"
+                                                    },
+                                                    {
+                                                        "path": "newScheduleItem._2.decentralizedSynchronizer.fees.baseRateTrafficLimits.burstWindow",
+                                                        "label": "Burst window",
+                                                        "format": "duration"
+                                                    },
+                                                    {
+                                                        "path": "newScheduleItem._2.decentralizedSynchronizer.requiredSynchronizers",
+                                                        "label": "Required synchronizers",
+                                                        "format": "raw"
+                                                    },
+                                                    {
+                                                        "path": "newScheduleItem._2.transferConfig.transferFee.steps",
+                                                        "label": "Transfer fee steps",
+                                                        "format": "raw"
+                                                    },
+                                                    {
+                                                        "path": "newScheduleItem._2.rewardConfig",
+                                                        "label": "Reward configuration",
+                                                        "cases": {
+                                                            "Some": {
+                                                                "label": "set",
+                                                                "fields": [
+                                                                    {
+                                                                        "path": "mintingVersion",
+                                                                        "label": "Minting",
+                                                                        "format": "enum",
+                                                                        "params": {
+                                                                            "$ref": "$.metadata.enums.rewardVersion"
+                                                                        }
+                                                                    },
+                                                                    {
+                                                                        "path": "dsoAppActivityWeight",
+                                                                        "label": "DSO app activity weight",
+                                                                        "format": "number"
+                                                                    }
+                                                                ]
+                                                            },
+                                                            "None": {
+                                                                "label": "default"
+                                                            }
+                                                        }
+                                                    }
+                                                ]
+                                            }
+                                        }
+                                    }
+                                ]
+                            },
+                            "ARC_AnsEntryContext": {
+                                "label": "an ANS entry"
+                            },
+                            "ExtActionRequiringConformation": {
+                                "label": "an extension action"
+                            }
                         }
-                    },
-                    {
-                        "path": "action.ARC_AmuletRules.amuletRulesAction.CRARC_AddFutureAmuletConfigSchedule.newScheduleItem._2.rewardConfig.dsoAppActivityWeight",
-                        "label": "DSO app activity weight",
-                        "format": "number"
                     }
                 ]
             },
@@ -134,29 +255,129 @@
                         "format": "string"
                     },
                     {
-                        "path": "newNodeConfig.sequencer.url",
-                        "label": "Sequencer URL",
-                        "format": "string"
+                        "path": "newNodeConfig.sequencer",
+                        "label": "Sequencer",
+                        "cases": {
+                            "Some": {
+                                "label": "set",
+                                "fields": [
+                                    {
+                                        "path": "sequencerId",
+                                        "label": "Sequencer ID",
+                                        "format": "string"
+                                    },
+                                    {
+                                        "path": "url",
+                                        "label": "URL",
+                                        "format": "string"
+                                    },
+                                    {
+                                        "path": "migrationId",
+                                        "label": "Migration",
+                                        "format": "number"
+                                    },
+                                    {
+                                        "path": "availableAfter",
+                                        "label": "Available after",
+                                        "format": "dateTime"
+                                    }
+                                ]
+                            },
+                            "None": {
+                                "label": "not set"
+                            }
+                        }
                     },
                     {
-                        "path": "newNodeConfig.sequencer.migrationId",
-                        "label": "Sequencer migration",
-                        "format": "number"
+                        "path": "newNodeConfig.legacySequencerConfig",
+                        "label": "Legacy sequencer",
+                        "cases": {
+                            "Some": {
+                                "label": "set",
+                                "fields": [
+                                    {
+                                        "path": "sequencerId",
+                                        "label": "Sequencer ID",
+                                        "format": "string"
+                                    },
+                                    {
+                                        "path": "url",
+                                        "label": "URL",
+                                        "format": "string"
+                                    },
+                                    {
+                                        "path": "migrationId",
+                                        "label": "Migration",
+                                        "format": "number"
+                                    }
+                                ]
+                            },
+                            "None": {
+                                "label": "not set"
+                            }
+                        }
                     },
                     {
-                        "path": "newNodeConfig.legacySequencerConfig.url",
-                        "label": "Legacy sequencer URL",
-                        "format": "string"
+                        "path": "newNodeConfig.sequencerIdentity",
+                        "label": "Sequencer identity",
+                        "cases": {
+                            "Some": {
+                                "label": "set",
+                                "fields": [
+                                    {
+                                        "path": "sequencerId",
+                                        "label": "Sequencer ID",
+                                        "format": "string"
+                                    },
+                                    {
+                                        "path": "availableAfter",
+                                        "label": "Available after",
+                                        "format": "dateTime"
+                                    }
+                                ]
+                            },
+                            "None": {
+                                "label": "not set"
+                            }
+                        }
                     },
                     {
-                        "path": "newNodeConfig.legacySequencerConfig.migrationId",
-                        "label": "Legacy sequencer migration",
-                        "format": "number"
+                        "path": "newNodeConfig.mediator",
+                        "label": "Mediator",
+                        "cases": {
+                            "Some": {
+                                "label": "set",
+                                "fields": [
+                                    {
+                                        "path": "mediatorId",
+                                        "label": "Mediator ID",
+                                        "format": "string"
+                                    }
+                                ]
+                            },
+                            "None": {
+                                "label": "not set"
+                            }
+                        }
                     },
                     {
-                        "path": "newNodeConfig.sequencerIdentity.availableAfter",
-                        "label": "Sequencer identity available after",
-                        "format": "dateTime"
+                        "path": "newNodeConfig.scan",
+                        "label": "Scan",
+                        "cases": {
+                            "Some": {
+                                "label": "set",
+                                "fields": [
+                                    {
+                                        "path": "publicUrl",
+                                        "label": "Public URL",
+                                        "format": "string"
+                                    }
+                                ]
+                            },
+                            "None": {
+                                "label": "not set"
+                            }
+                        }
                     },
                     {
                         "path": "newNodeConfig.cometBft.governanceKeys.length",

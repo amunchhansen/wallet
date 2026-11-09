@@ -352,6 +352,12 @@ class WgTransactionDetail extends BaseElement {
                 word-break: break-word;
             }
 
+            .operation-fields dd.case-fields {
+                grid-column: 1 / -1;
+                padding-left: var(--wg-space-3);
+                border-left: 2px solid var(--wg-border);
+            }
+
             .actions {
                 margin-top: var(--wg-space-6);
                 display: flex;
@@ -512,18 +518,7 @@ class WgTransactionDetail extends BaseElement {
                     </p>
                 </div>
                 ${renderOperationOrigin(op)}
-                ${
-                    op.fields.length
-                        ? html`<dl class="operation-fields">
-                              ${op.fields.map(
-                                  (field) => html`
-                                      <dt class="label">${field.label}</dt>
-                                      <dd>${renderFieldValue(field)}</dd>
-                                  `
-                              )}
-                          </dl>`
-                        : nothing
-                }
+                ${op.fields.length ? renderFields(op.fields) : nothing}
             </div>
         `
     }
@@ -752,6 +747,25 @@ function renderOperationOrigin(op: OperationDescription) {
                       </dd>`
                 : nothing
         }
+    </dl>`
+}
+
+// The fields of a matched case are shown under their field, across both columns.
+function renderFields(fields: DescribedField[]): unknown {
+    return html`<dl class="operation-fields">
+        ${fields.map(
+            (field) => html`
+                <dt class="label">${field.label}</dt>
+                <dd>${renderFieldValue(field)}</dd>
+                ${
+                    field.fields?.length
+                        ? html`<dd class="case-fields">
+                              ${renderFields(field.fields)}
+                          </dd>`
+                        : nothing
+                }
+            `
+        )}
     </dl>`
 }
 

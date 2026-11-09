@@ -16,8 +16,12 @@ const NAME_STEP = `${NAME}(?:${MAP_KEY})*`
 const STEPS = `${NAME_STEP}(?:\\.${NAME_STEP})*`
 
 const identifier = new RegExp(`^${NAME}$`)
+// Daml constructors start with an uppercase letter, as do the Optional cases Some and None
+const caseName = /^[A-Z][A-Za-z0-9_]*$/
 const dottedName = new RegExp(`^${NAME}(?:\\.${NAME})*$`)
 const pathPattern = new RegExp(`^(?:${STEPS}|@\\.contract\\.${STEPS})$`)
+/** A path inside a case: it starts at the matched value, so it cannot read the contract. */
+const relativePathPattern = new RegExp(`^${STEPS}$`)
 const enumRef = new RegExp(`^\\$\\.metadata\\.enums\\.${NAME}$`)
 const semver =
     /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$/
@@ -40,16 +44,59 @@ const FORMATS = [
     'raw',
 ] as const
 
-const FieldSchema = z
-    .strictObject({
-        path: z.string().regex(pathPattern),
-        label: z.string().regex(displayText).optional(),
-        format: z.enum(FORMATS).optional(),
-        params: z.strictObject({ $ref: z.string().regex(enumRef) }).optional(),
-    })
-    .refine((f) => (f.format === 'enum') === (f.params !== undefined), {
-        message:
-            "params are required with format 'enum' and forbidden otherwise",
+/** A value to display. With `cases`, the field shows the shape of its value instead of a format. */
+export interface Field {
+    path: string
+    label?: string | undefined
+    format?: Format | undefined
+    params?: { $ref: string } | undefined
+    cases?: Record<string, Case> | undefined
+}
+
+/** How a field is shown when its value has one shape: a variant constructor, `Some` or `None`. */
+export interface Case {
+    label?: string | undefined
+    fields?: Field[] | undefined
+}
+
+function fieldSchema(path: RegExp) {
+    return z
+        .strictObject({
+            path: z.string().regex(path),
+            label: z.string().regex(displayText).optional(),
+            format: z.enum(FORMATS).optional(),
+            params: z
+                .strictObject({ $ref: z.string().regex(enumRef) })
+                .optional(),
+            cases: CasesSchema.optional(),
+        })
+        .refine((f) => (f.format === 'enum') === (f.params !== undefined), {
+            message:
+                "params are required with format 'enum' and forbidden otherwise",
+        })
+        .refine((f) => f.cases === undefined || f.format === undefined, {
+            message: 'a field with cases has no format',
+        })
+}
+
+const FieldSchema: z.ZodType<Field> = z.lazy(() => fieldSchema(pathPattern))
+const CaseFieldSchema: z.ZodType<Field> = z.lazy(() =>
+    fieldSchema(relativePathPattern)
+)
+const CaseSchema: z.ZodType<Case> = z.lazy(() =>
+    z
+        .strictObject({
+            label: z.string().regex(displayText).optional(),
+            fields: z.array(CaseFieldSchema).min(1).optional(),
+        })
+        .refine((c) => c.label !== undefined || c.fields !== undefined, {
+            message: 'a case needs a label or fields',
+        })
+)
+const CasesSchema = z
+    .record(z.string().regex(caseName), CaseSchema)
+    .refine((cases) => Object.keys(cases).length > 0, {
+        message: 'cases needs at least one entry',
     })
 
 const OperationSchema = z.strictObject({
@@ -106,7 +153,6 @@ const DescriptorSchema = z.strictObject({
 
 export type Descriptor = z.infer<typeof DescriptorSchema>
 export type Operation = z.infer<typeof OperationSchema>
-export type Field = z.infer<typeof FieldSchema>
 export type Format = (typeof FORMATS)[number]
 
 export class DescriptorError extends Error {
@@ -163,26 +209,14 @@ function operationProblems(
 ): string[] {
     const problems: string[] = []
     const ownPaths = fieldPaths(op)
-    const seen = new Set<string>()
     for (const f of op.fields ?? []) {
-        if (seen.has(f.path)) {
-            problems.push(
-                `${where}: field '${f.path}' is declared more than once`
-            )
-        }
-        seen.add(f.path)
         if (f.path.startsWith(CONTRACT_PREFIX)) {
             problems.push(
                 `${where}: field '${f.path}' reads the contract; declare it in create`
             )
         }
-        const enumName = f.params?.$ref.slice('$.metadata.enums.'.length)
-        if (enumName !== undefined && !d.metadata.enums?.[enumName]) {
-            problems.push(
-                `${where}: field '${f.path}' references missing enum '${f.params?.$ref}'`
-            )
-        }
     }
+    problems.push(...fieldProblems(d, where, op.fields ?? []))
 
     let segments
     try {
@@ -212,6 +246,42 @@ function operationProblems(
     return problems
 }
 
+// Checks a list of fields and, recursively, the fields of their cases: each list declares a path
+// once, and every enum reference names a table.
+function fieldProblems(
+    d: Descriptor,
+    where: string,
+    fields: Field[]
+): string[] {
+    const problems: string[] = []
+    const seen = new Set<string>()
+    for (const f of fields) {
+        if (seen.has(f.path)) {
+            problems.push(
+                `${where}: field '${f.path}' is declared more than once`
+            )
+        }
+        seen.add(f.path)
+        const enumName = f.params?.$ref.slice('$.metadata.enums.'.length)
+        if (enumName !== undefined && !d.metadata.enums?.[enumName]) {
+            problems.push(
+                `${where}: field '${f.path}' references missing enum '${f.params?.$ref}'`
+            )
+        }
+        for (const [name, c] of Object.entries(f.cases ?? {})) {
+            problems.push(
+                ...fieldProblems(
+                    d,
+                    `${where}: field '${f.path}' case '${name}'`,
+                    c.fields ?? []
+                )
+            )
+        }
+    }
+    return problems
+}
+
+// The paths an interpolatedIntent may name: the operation's own fields, not the fields of their cases.
 function fieldPaths(op: Operation): string[] {
     return (op.fields ?? []).map((f) => f.path)
 }

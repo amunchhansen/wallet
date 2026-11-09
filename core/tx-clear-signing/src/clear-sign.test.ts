@@ -528,3 +528,93 @@ describe('clearSign', () => {
         )
     })
 })
+
+describe('cases', () => {
+    const describeAllKinds = (
+        fields: unknown[],
+        interpolatedIntent?: string
+    ) => {
+        const descriptor = vectorDescriptor('AllKinds', {
+            create: { intent: 'All kinds', interpolatedIntent, fields },
+        })
+        return clearSign(allValues.preparedTransaction, [descriptor])
+    }
+
+    it('shows the matched case label and its fields, resolved against the payload', () => {
+        const result = describeAllKinds(
+            [
+                {
+                    path: 'values',
+                    label: 'Values',
+                    cases: { Some: { label: 'unused' } },
+                },
+                {
+                    path: 'values.variantValue',
+                    label: 'Shape',
+                    cases: {
+                        Circle: { label: 'a circle' },
+                        Square: { label: 'a square' },
+                    },
+                },
+                {
+                    path: 'values.optionalValue',
+                    label: 'Optional',
+                    cases: {
+                        Some: {
+                            label: 'set',
+                            fields: [{ path: 'x', label: 'Inner' }],
+                        },
+                    },
+                },
+            ],
+            'It is {values.variantValue}'
+        )
+        const [op] = result.operations
+        expect(intentText(op)).toBe('It is a circle')
+        expect(op?.fields).toEqual([
+            {
+                label: 'Values',
+                path: 'values',
+                error: 'cases applied to record',
+            },
+            {
+                label: 'Shape',
+                path: 'values.variantValue',
+                value: 'a circle',
+                case: 'Circle',
+            },
+            {
+                label: 'Optional',
+                path: 'values.optionalValue',
+                value: 'set',
+                case: 'Some',
+                fields: [
+                    {
+                        label: 'Inner',
+                        path: 'x',
+                        error: "'x' applied to int64",
+                    },
+                ],
+            },
+        ])
+        // An error in a matched case's field makes the transaction incomplete
+        expect(result.complete).toBe(false)
+    })
+
+    it('shows the case name when no case matches, and keeps it out of the sentence', () => {
+        const result = describeAllKinds(
+            [
+                {
+                    path: 'values.variantValue',
+                    label: 'Shape',
+                    cases: { Square: { label: 'a square' } },
+                },
+            ],
+            'It is {values.variantValue}'
+        )
+        const [op] = result.operations
+        expect(op?.status).toBe('fallback')
+        expect(op?.fields[0]).toMatchObject({ value: 'Circle', case: 'Circle' })
+        expect(result.complete).toBe(false)
+    })
+})

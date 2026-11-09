@@ -176,6 +176,55 @@ describe('parseDescriptor', () => {
         expect(() => parseDescriptor({ ...ping, display })).not.toThrow()
     })
 
+    it('checks the fields of cases like any other fields', () => {
+        const withCases = (fields: unknown[], interpolatedIntent?: string) => ({
+            ...ping,
+            metadata: { ...ping.metadata, enums: { kind: { Red: 'red' } } },
+            display: {
+                create: {
+                    intent: 'Ping',
+                    interpolatedIntent,
+                    fields: [{ path: 'id', cases: { Some: { fields } } }],
+                },
+            },
+        })
+        expect(() =>
+            parseDescriptor(withCases([{ path: 'x' }, { path: 'x' }]))
+        ).toThrow("case 'Some': field 'x' is declared more than once")
+        expect(() =>
+            parseDescriptor(
+                withCases([
+                    {
+                        path: 'x',
+                        format: 'enum',
+                        params: { $ref: '$.metadata.enums.missing' },
+                    },
+                ])
+            )
+        ).toThrow("references missing enum '$.metadata.enums.missing'")
+        // A case field cannot be used in the sentence
+        expect(() =>
+            parseDescriptor(withCases([{ path: 'x' }], 'Ping {x}'))
+        ).toThrow("placeholder 'x' has no field with that path")
+        expect(() =>
+            parseDescriptor(withCases([{ path: 'x' }], 'Ping {id}'))
+        ).not.toThrow()
+    })
+
+    it('needs a label or fields in a case', () => {
+        expect(() =>
+            parseDescriptor({
+                ...ping,
+                display: {
+                    create: {
+                        intent: 'Ping',
+                        fields: [{ path: 'id', cases: { Some: {} } }],
+                    },
+                },
+            })
+        ).toThrow('a case needs a label or fields')
+    })
+
     it('needs create or exercises', () => {
         expect(() => parseDescriptor({ ...ping, display: {} })).toThrow(
             'display needs create or exercises'
