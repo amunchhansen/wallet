@@ -8,14 +8,14 @@
         }
     },
     "metadata": {
-        "version": "1.1.0",
+        "version": "1.3.0",
         "publisher": "<splice publisher>",
         "name": "Splitwell balance update"
     },
     "display": {
         "create": {
             "intent": "Record a Splitwell balance update",
-            "interpolatedIntent": "Record a {update} in group {group.id.unpack} of {group.owner}",
+            "interpolatedIntent": "Record a balance update in group {group.id.unpack} of {group.owner}",
             "fields": [
                 {
                     "path": "group.id.unpack",
@@ -35,58 +35,7 @@
                 {
                     "path": "update",
                     "label": "Update",
-                    "cases": {
-                        "ExternalPayment": {
-                            "label": "payment",
-                            "fields": [
-                                {
-                                    "path": "payer",
-                                    "label": "Payer",
-                                    "format": "party"
-                                },
-                                {
-                                    "path": "amount",
-                                    "label": "Amount",
-                                    "format": "number"
-                                },
-                                {
-                                    "path": "description",
-                                    "label": "Description",
-                                    "format": "string"
-                                }
-                            ]
-                        },
-                        "Transfer": {
-                            "label": "transfer",
-                            "fields": [
-                                {
-                                    "path": "sender",
-                                    "label": "Sender",
-                                    "format": "party"
-                                },
-                                {
-                                    "path": "receiver",
-                                    "label": "Receiver",
-                                    "format": "party"
-                                },
-                                {
-                                    "path": "amount",
-                                    "label": "Amount",
-                                    "format": "number"
-                                }
-                            ]
-                        },
-                        "Netting": {
-                            "label": "netting",
-                            "fields": [
-                                {
-                                    "path": "balanceChanges",
-                                    "label": "Balance changes",
-                                    "format": "raw"
-                                }
-                            ]
-                        }
-                    }
+                    "format": "raw"
                 }
             ]
         }

@@ -8,14 +8,14 @@
         }
     },
     "metadata": {
-        "version": "1.3.0",
+        "version": "1.5.0",
         "publisher": "<splice publisher>",
         "name": "Governance lock"
     },
     "display": {
         "create": {
             "intent": "Create a governance lock",
-            "interpolatedIntent": "Create a {specification} of {amount} for {owner}",
+            "interpolatedIntent": "Create a governance lock of {amount} for {owner}",
             "fields": [
                 {
                     "path": "amount",
@@ -35,100 +35,7 @@
                 {
                     "path": "specification",
                     "label": "Lock type",
-                    "cases": {
-                        "GLS_VestingLock": {
-                            "label": "vesting lock",
-                            "fields": [
-                                {
-                                    "path": "kind",
-                                    "label": "Lock for",
-                                    "cases": {
-                                        "GLK_FeaturedApp": {
-                                            "label": "featured app",
-                                            "fields": [
-                                                {
-                                                    "path": "provider",
-                                                    "label": "Provider",
-                                                    "format": "party"
-                                                }
-                                            ]
-                                        },
-                                        "GLK_ProvisionalFeaturedApp": {
-                                            "label": "provisional featured app",
-                                            "fields": [
-                                                {
-                                                    "path": "provider",
-                                                    "label": "Provider",
-                                                    "format": "party"
-                                                }
-                                            ]
-                                        },
-                                        "GLK_SuperValidatorRightsOwner": {
-                                            "label": "super validator",
-                                            "fields": [
-                                                {
-                                                    "path": "svName",
-                                                    "label": "SV",
-                                                    "format": "string"
-                                                }
-                                            ]
-                                        }
-                                    }
-                                },
-                                {
-                                    "path": "vestingPeriod",
-                                    "label": "Vesting period",
-                                    "format": "duration"
-                                },
-                                {
-                                    "path": "endTime",
-                                    "label": "Vesting ends",
-                                    "format": "dateTime"
-                                }
-                            ]
-                        },
-                        "GLS_FullLock": {
-                            "label": "full lock",
-                            "fields": [
-                                {
-                                    "path": "kind",
-                                    "label": "Lock for",
-                                    "cases": {
-                                        "GLK_FeaturedApp": {
-                                            "label": "featured app",
-                                            "fields": [
-                                                {
-                                                    "path": "provider",
-                                                    "label": "Provider",
-                                                    "format": "party"
-                                                }
-                                            ]
-                                        },
-                                        "GLK_ProvisionalFeaturedApp": {
-                                            "label": "provisional featured app",
-                                            "fields": [
-                                                {
-                                                    "path": "provider",
-                                                    "label": "Provider",
-                                                    "format": "party"
-                                                }
-                                            ]
-                                        },
-                                        "GLK_SuperValidatorRightsOwner": {
-                                            "label": "super validator",
-                                            "fields": [
-                                                {
-                                                    "path": "svName",
-                                                    "label": "SV",
-                                                    "format": "string"
-                                                }
-                                            ]
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
+                    "format": "raw"
                 },
                 {
                     "path": "lockedAmulet",
@@ -140,9 +47,7 @@
                     "label": "Replaces",
                     "format": "contractId",
                     "cases": {
-                        "None": {
-                            "label": "none"
-                        }
+                        "None": {}
                     }
                 },
                 {

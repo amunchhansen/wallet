@@ -37,10 +37,10 @@ describe('TransferInstruction_Accept on a utility TransferOffer', () => {
             ['Instrument', 'Tebirkes'],
             ['From', SENDER],
             ['To', RECEIVER],
-            ['Transfer rule', TRANSFER_RULE],
+            ['Transfer rule', `{"AV_ContractId":"${TRANSFER_RULE}"}`],
         ])
         expect(intentText(op)).toBe(
-            `Accept 0.0000000421 Tebirkes from ${SENDER} to ${RECEIVER}, settled according to the transfer rule at ${TRANSFER_RULE}`
+            `Accept 0.0000000421 Tebirkes from ${SENDER} to ${RECEIVER}, settled according to the transfer rule {"AV_ContractId":"${TRANSFER_RULE}"}`
         )
     })
 })

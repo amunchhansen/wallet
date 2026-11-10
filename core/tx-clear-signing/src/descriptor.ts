@@ -3,7 +3,6 @@
 
 import { z } from 'zod'
 import { parseIntent } from './intent.js'
-import { templateKey } from './roots.js'
 
 // The patterns are those of canton-clear-signing-v1.schema.json. The conformance test runs the
 // schema's own valid and invalid examples through this parser.
@@ -17,8 +16,6 @@ const NAME_STEP = `${NAME}(?:${MAP_KEY})*`
 const STEPS = `${NAME_STEP}(?:\\.${NAME_STEP})*`
 
 const identifier = new RegExp(`^${NAME}$`)
-// Daml constructors start with an uppercase letter, as do the Optional cases Some and None
-const caseName = /^[A-Z][A-Za-z0-9_]*$/
 const dottedName = new RegExp(`^${NAME}(?:\\.${NAME})*$`)
 /** A path of an exercise field, which may read the exercised contract. */
 const pathPattern = new RegExp(`^(?:${STEPS}|@\\.contract\\.${STEPS})$`)
@@ -46,7 +43,7 @@ const FORMATS = [
     'raw',
 ] as const
 
-/** A value to display. With `cases`, the field shows the shape of its value instead of a format. */
+/** A value to display. With `cases`, the field lists whether an Optional is `Some` or `None`. */
 export interface Field {
     path: string
     label?: string | undefined
@@ -55,9 +52,8 @@ export interface Field {
     cases?: Record<string, Case> | undefined
 }
 
-/** How a field is shown when its value has one shape: a variant constructor, `Some` or `None`. */
+/** A `Some` or `None` an optional value may have, and the fields of a `Some`. */
 export interface Case {
-    label?: string | undefined
     fields?: Field[] | undefined
 }
 
@@ -83,19 +79,28 @@ const CaseFieldSchema: z.ZodType<Field> = z.lazy(() =>
     fieldSchema(relativePathPattern)
 )
 const CaseSchema: z.ZodType<Case> = z.lazy(() =>
-    z
-        .strictObject({
-            label: z.string().regex(displayText).optional(),
-            fields: z.array(CaseFieldSchema).min(1).optional(),
-        })
-        .refine((c) => c.label !== undefined || c.fields !== undefined, {
-            message: 'a case needs a label or fields',
-        })
+    z.strictObject({
+        fields: z.array(CaseFieldSchema).min(1).optional(),
+    })
 )
 const CasesSchema = z
-    .record(z.string().regex(caseName), CaseSchema)
-    .refine((cases) => Object.keys(cases).length > 0, {
-        message: 'cases needs at least one entry',
+    .record(z.string(), CaseSchema)
+    .superRefine((cases, ctx) => {
+        const names = Object.keys(cases)
+        if (names.length === 0) {
+            ctx.addIssue({
+                code: 'custom',
+                message: 'cases needs at least one entry',
+            })
+        }
+        for (const name of names) {
+            if (name !== 'Some' && name !== 'None') {
+                ctx.addIssue({
+                    code: 'custom',
+                    message: `case '${name}' is not 'Some' or 'None'`,
+                })
+            }
+        }
     })
 
 function operationSchema(field: z.ZodType<Field>) {
@@ -114,10 +119,16 @@ const TemplateIdSchema = z.strictObject({
     entityName: z.string().regex(identifier),
 })
 
+/** An interface the template implements. Its package is fixed by the template's package. */
+const InterfaceSchema = z.strictObject({
+    moduleName: z.string().regex(dottedName),
+    entityName: z.string().regex(identifier),
+})
+
 /** One choice of the template, optionally only when exercised through one interface. */
 const ExerciseSchema = operationSchema(FieldSchema).extend({
     choice: z.string().regex(identifier),
-    interface: TemplateIdSchema.optional(),
+    interface: InterfaceSchema.optional(),
 })
 
 const EnumTableSchema = z
@@ -222,7 +233,7 @@ function crossReferenceProblems(d: Descriptor): string[] {
 function exerciseKey(exercise: Exercise): string {
     const iface = exercise.interface
     return iface
-        ? `${exercise.choice} via ${templateKey(iface)}`
+        ? `${exercise.choice} via ${iface.moduleName}:${iface.entityName}`
         : exercise.choice
 }
 

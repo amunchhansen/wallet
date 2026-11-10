@@ -8,7 +8,7 @@
         }
     },
     "metadata": {
-        "version": "1.2.0",
+        "version": "1.4.0",
         "publisher": "<utility-registry publisher>",
         "name": "Utility registry transfer offer"
     },
@@ -47,8 +47,12 @@
         "exercises": [
             {
                 "choice": "TransferInstruction_Accept",
+                "interface": {
+                    "moduleName": "Splice.Api.Token.TransferInstructionV1",
+                    "entityName": "TransferInstruction"
+                },
                 "intent": "Accept transfer offer",
-                "interpolatedIntent": "Accept {@.contract.transfer.amount} {@.contract.transfer.instrumentId.id} from {@.contract.transfer.sender} to {@.contract.transfer.receiver}, settled according to the transfer rule at {extraArgs.context.values[\"utility.digitalasset.com/transfer-rule\"].AV_ContractId}",
+                "interpolatedIntent": "Accept {@.contract.transfer.amount} {@.contract.transfer.instrumentId.id} from {@.contract.transfer.sender} to {@.contract.transfer.receiver}, settled according to the transfer rule {extraArgs.context.values[\"utility.digitalasset.com/transfer-rule\"]}",
                 "fields": [
                     {
                         "path": "@.contract.transfer.amount",
@@ -71,14 +75,18 @@
                         "format": "party"
                     },
                     {
-                        "path": "extraArgs.context.values[\"utility.digitalasset.com/transfer-rule\"].AV_ContractId",
+                        "path": "extraArgs.context.values[\"utility.digitalasset.com/transfer-rule\"]",
                         "label": "Transfer rule",
-                        "format": "contractId"
+                        "format": "raw"
                     }
                 ]
             },
             {
                 "choice": "TransferInstruction_Reject",
+                "interface": {
+                    "moduleName": "Splice.Api.Token.TransferInstructionV1",
+                    "entityName": "TransferInstruction"
+                },
                 "intent": "Reject transfer offer",
                 "interpolatedIntent": "Reject {@.contract.transfer.amount} {@.contract.transfer.instrumentId.id} from {@.contract.transfer.sender}",
                 "fields": [

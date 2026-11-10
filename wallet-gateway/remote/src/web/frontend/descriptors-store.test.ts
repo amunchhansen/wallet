@@ -108,7 +108,7 @@ describe('descriptors store', () => {
 
     it('keeps both interface entries of one descriptor, and replaces the built-in', () => {
         const iface = (entityName: string) => ({
-            ...builtInPing.context.template,
+            moduleName: 'Canton.Internal.Ping',
             entityName,
         })
         addDescriptor({

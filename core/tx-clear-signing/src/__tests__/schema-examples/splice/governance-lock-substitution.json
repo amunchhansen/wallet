@@ -8,14 +8,14 @@
         }
     },
     "metadata": {
-        "version": "2.2.0",
+        "version": "2.5.0",
         "publisher": "<splice publisher>",
         "name": "Governance lock substitution"
     },
     "display": {
         "create": {
             "intent": "Propose a governance lock substitution",
-            "interpolatedIntent": "Propose substituting {amount} of the {target.specification} of {target.owner}, proposed by {owner}",
+            "interpolatedIntent": "Propose substituting {amount} of the governance lock of {target.owner}, proposed by {owner}",
             "fields": [
                 {
                     "path": "amount",
@@ -35,109 +35,14 @@
                 {
                     "path": "target.specification",
                     "label": "Lock type",
-                    "cases": {
-                        "GLS_VestingLock": {
-                            "label": "vesting lock",
-                            "fields": [
-                                {
-                                    "path": "kind",
-                                    "label": "Lock for",
-                                    "cases": {
-                                        "GLK_FeaturedApp": {
-                                            "label": "featured app",
-                                            "fields": [
-                                                {
-                                                    "path": "provider",
-                                                    "label": "Provider",
-                                                    "format": "party"
-                                                }
-                                            ]
-                                        },
-                                        "GLK_ProvisionalFeaturedApp": {
-                                            "label": "provisional featured app",
-                                            "fields": [
-                                                {
-                                                    "path": "provider",
-                                                    "label": "Provider",
-                                                    "format": "party"
-                                                }
-                                            ]
-                                        },
-                                        "GLK_SuperValidatorRightsOwner": {
-                                            "label": "super validator",
-                                            "fields": [
-                                                {
-                                                    "path": "svName",
-                                                    "label": "SV",
-                                                    "format": "string"
-                                                }
-                                            ]
-                                        }
-                                    }
-                                },
-                                {
-                                    "path": "vestingPeriod",
-                                    "label": "Vesting period",
-                                    "format": "duration"
-                                },
-                                {
-                                    "path": "endTime",
-                                    "label": "Vesting ends",
-                                    "format": "dateTime"
-                                }
-                            ]
-                        },
-                        "GLS_FullLock": {
-                            "label": "full lock",
-                            "fields": [
-                                {
-                                    "path": "kind",
-                                    "label": "Lock for",
-                                    "cases": {
-                                        "GLK_FeaturedApp": {
-                                            "label": "featured app",
-                                            "fields": [
-                                                {
-                                                    "path": "provider",
-                                                    "label": "Provider",
-                                                    "format": "party"
-                                                }
-                                            ]
-                                        },
-                                        "GLK_ProvisionalFeaturedApp": {
-                                            "label": "provisional featured app",
-                                            "fields": [
-                                                {
-                                                    "path": "provider",
-                                                    "label": "Provider",
-                                                    "format": "party"
-                                                }
-                                            ]
-                                        },
-                                        "GLK_SuperValidatorRightsOwner": {
-                                            "label": "super validator",
-                                            "fields": [
-                                                {
-                                                    "path": "svName",
-                                                    "label": "SV",
-                                                    "format": "string"
-                                                }
-                                            ]
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
+                    "format": "raw"
                 },
                 {
                     "path": "lockedAmulet",
                     "label": "Funding",
                     "format": "contractId",
                     "cases": {
-                        "None": {
-                            "label": "none"
-                        }
+                        "None": {}
                     }
                 },
                 {
@@ -150,9 +55,7 @@
                     "label": "First proposal",
                     "format": "contractId",
                     "cases": {
-                        "None": {
-                            "label": "none"
-                        }
+                        "None": {}
                     }
                 }
             ]
@@ -161,12 +64,11 @@
             {
                 "choice": "TransferInstruction_Accept",
                 "interface": {
-                    "packageId": "55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281",
                     "moduleName": "Splice.Api.Token.TransferInstructionV1",
                     "entityName": "TransferInstruction"
                 },
                 "intent": "Accept a governance lock substitution",
-                "interpolatedIntent": "Accept the substitution of {@.contract.amount} of the {@.contract.target.specification} of {@.contract.target.owner}, proposed by {@.contract.owner}",
+                "interpolatedIntent": "Accept the substitution of {@.contract.amount} of the governance lock of {@.contract.target.owner}, proposed by {@.contract.owner}",
                 "fields": [
                     {
                         "path": "@.contract.amount",
@@ -176,14 +78,7 @@
                     {
                         "path": "@.contract.target.specification",
                         "label": "Lock type",
-                        "cases": {
-                            "GLS_VestingLock": {
-                                "label": "vesting lock"
-                            },
-                            "GLS_FullLock": {
-                                "label": "full lock"
-                            }
-                        }
+                        "format": "raw"
                     },
                     {
                         "path": "@.contract.target.owner",
@@ -205,7 +100,6 @@
             {
                 "choice": "TransferInstruction_Reject",
                 "interface": {
-                    "packageId": "55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281",
                     "moduleName": "Splice.Api.Token.TransferInstructionV1",
                     "entityName": "TransferInstruction"
                 },
@@ -227,12 +121,11 @@
             {
                 "choice": "TransferInstruction_Accept",
                 "interface": {
-                    "packageId": "29317e3b7b165d2bbf16721bcca0ec4869e53eddb2738bddf790d61af28e0099",
                     "moduleName": "Splice.Api.Token.TransferInstructionV2",
                     "entityName": "TransferInstruction"
                 },
                 "intent": "Accept a governance lock substitution",
-                "interpolatedIntent": "Accept the substitution of {@.contract.amount} of the {@.contract.target.specification} of {@.contract.target.owner}, proposed by {@.contract.owner}",
+                "interpolatedIntent": "Accept the substitution of {@.contract.amount} of the governance lock of {@.contract.target.owner}, proposed by {@.contract.owner}",
                 "fields": [
                     {
                         "path": "@.contract.amount",
@@ -242,14 +135,7 @@
                     {
                         "path": "@.contract.target.specification",
                         "label": "Lock type",
-                        "cases": {
-                            "GLS_VestingLock": {
-                                "label": "vesting lock"
-                            },
-                            "GLS_FullLock": {
-                                "label": "full lock"
-                            }
-                        }
+                        "format": "raw"
                     },
                     {
                         "path": "@.contract.target.owner",
@@ -276,7 +162,6 @@
             {
                 "choice": "TransferInstruction_Reject",
                 "interface": {
-                    "packageId": "29317e3b7b165d2bbf16721bcca0ec4869e53eddb2738bddf790d61af28e0099",
                     "moduleName": "Splice.Api.Token.TransferInstructionV2",
                     "entityName": "TransferInstruction"
                 },

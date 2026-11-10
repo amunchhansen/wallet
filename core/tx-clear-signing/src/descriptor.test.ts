@@ -221,7 +221,7 @@ describe('parseDescriptor', () => {
                             {
                                 path: 'id',
                                 format: 'string',
-                                cases: { None: { label: 'not set' } },
+                                cases: { None: {} },
                             },
                         ],
                     },
@@ -230,18 +230,58 @@ describe('parseDescriptor', () => {
         ).not.toThrow()
     })
 
-    it('needs a label or fields in a case', () => {
+    it('rejects a package ID on an exercise interface', () => {
         expect(() =>
             parseDescriptor({
                 ...ping,
                 display: {
-                    create: {
-                        intent: 'Ping',
-                        fields: [{ path: 'id', cases: { Some: {} } }],
-                    },
+                    exercises: [
+                        {
+                            choice: 'Respond',
+                            intent: 'Respond',
+                            interface: {
+                                ...ping.context.template,
+                                entityName: 'Asset',
+                            },
+                        },
+                    ],
                 },
             })
-        ).toThrow('a case needs a label or fields')
+        ).toThrow('interface')
+    })
+
+    it('rejects a case that is not Some or None', () => {
+        const withCases = (cases: unknown) => ({
+            ...ping,
+            display: {
+                create: {
+                    intent: 'Ping',
+                    fields: [{ path: 'id', cases }],
+                },
+            },
+        })
+        expect(() => parseDescriptor(withCases({ GLS_FullLock: {} }))).toThrow(
+            "case 'GLS_FullLock' is not 'Some' or 'None'"
+        )
+        expect(() =>
+            parseDescriptor(withCases({ Some: {}, GLS_FullLock: {} }))
+        ).toThrow("case 'GLS_FullLock' is not 'Some' or 'None'")
+    })
+
+    it('accepts an empty case, and rejects a case label', () => {
+        const withCase = (c: unknown) => ({
+            ...ping,
+            display: {
+                create: {
+                    intent: 'Ping',
+                    fields: [{ path: 'id', cases: { None: c } }],
+                },
+            },
+        })
+        expect(() => parseDescriptor(withCase({}))).not.toThrow()
+        expect(() => parseDescriptor(withCase({ label: 'not set' }))).toThrow(
+            'label'
+        )
     })
 
     it('needs create or exercises', () => {
@@ -251,7 +291,10 @@ describe('parseDescriptor', () => {
     })
 
     it('rejects two entries for the same choice and interface', () => {
-        const iface = { ...ping.context.template, entityName: 'Asset' }
+        const iface = {
+            moduleName: 'Canton.Internal.Ping',
+            entityName: 'Asset',
+        }
         expect(() =>
             parseDescriptor({
                 ...ping,

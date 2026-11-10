@@ -76,11 +76,11 @@ export interface Resolved {
 const NONE: Value = { sum: { oneofKind: 'optional', optional: {} } }
 
 /**
- * Resolves the steps of a path against a Daml value. A name step selects a record field by label or
- * the payload of a variant with that constructor. `Some` is unwrapped at every step. A `None` at any
- * step, or a record field that is not in the record, resolves the whole path to `None`; for a
- * missing field, `absentField` is set. A final `length` step on a list or text map yields its number
- * of elements as an int64.
+ * Resolves the steps of a path against a Daml value. A name step selects a record field by label.
+ * `Some` is unwrapped at every step. A name step never enters a variant: a variant is shown whole.
+ * A `None` at any step, or a record field that is not in the record, resolves the whole path to
+ * `None`; for a missing field, `absentField` is set. A final `length` step on a list or text map
+ * yields its number of elements as an int64.
  *
  * @throws PathError when a step does not resolve
  */
@@ -143,12 +143,9 @@ function selectName(v: Value, name: string, isLast: boolean): Value {
             return present(field?.value)
         }
         case 'variant':
-            if (sum.variant.constructor !== name) {
-                throw new PathError(
-                    `variant is '${sum.variant.constructor}', not '${name}'`
-                )
-            }
-            return present(sum.variant.value)
+            throw new PathError(
+                `'${name}' applied to variant '${sum.variant.constructor}'; a variant is shown whole`
+            )
         case 'list':
             if (name === 'length' && isLast) {
                 return int64(sum.list.elements.length)

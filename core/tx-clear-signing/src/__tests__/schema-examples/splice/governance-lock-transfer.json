@@ -8,14 +8,14 @@
         }
     },
     "metadata": {
-        "version": "2.1.0",
+        "version": "2.4.0",
         "publisher": "<splice publisher>",
         "name": "Governance lock transfer"
     },
     "display": {
         "create": {
             "intent": "Propose a governance lock transfer",
-            "interpolatedIntent": "Transfer {amount} of the {source.specification}s of {source.owner} to {receiver}",
+            "interpolatedIntent": "Transfer {amount} of the governance locks of {source.owner} to {receiver}",
             "fields": [
                 {
                     "path": "amount",
@@ -35,100 +35,7 @@
                 {
                     "path": "source.specification",
                     "label": "Lock type",
-                    "cases": {
-                        "GLS_VestingLock": {
-                            "label": "vesting lock",
-                            "fields": [
-                                {
-                                    "path": "kind",
-                                    "label": "Lock for",
-                                    "cases": {
-                                        "GLK_FeaturedApp": {
-                                            "label": "featured app",
-                                            "fields": [
-                                                {
-                                                    "path": "provider",
-                                                    "label": "Provider",
-                                                    "format": "party"
-                                                }
-                                            ]
-                                        },
-                                        "GLK_ProvisionalFeaturedApp": {
-                                            "label": "provisional featured app",
-                                            "fields": [
-                                                {
-                                                    "path": "provider",
-                                                    "label": "Provider",
-                                                    "format": "party"
-                                                }
-                                            ]
-                                        },
-                                        "GLK_SuperValidatorRightsOwner": {
-                                            "label": "super validator",
-                                            "fields": [
-                                                {
-                                                    "path": "svName",
-                                                    "label": "SV",
-                                                    "format": "string"
-                                                }
-                                            ]
-                                        }
-                                    }
-                                },
-                                {
-                                    "path": "vestingPeriod",
-                                    "label": "Vesting period",
-                                    "format": "duration"
-                                },
-                                {
-                                    "path": "endTime",
-                                    "label": "Vesting ends",
-                                    "format": "dateTime"
-                                }
-                            ]
-                        },
-                        "GLS_FullLock": {
-                            "label": "full lock",
-                            "fields": [
-                                {
-                                    "path": "kind",
-                                    "label": "Lock for",
-                                    "cases": {
-                                        "GLK_FeaturedApp": {
-                                            "label": "featured app",
-                                            "fields": [
-                                                {
-                                                    "path": "provider",
-                                                    "label": "Provider",
-                                                    "format": "party"
-                                                }
-                                            ]
-                                        },
-                                        "GLK_ProvisionalFeaturedApp": {
-                                            "label": "provisional featured app",
-                                            "fields": [
-                                                {
-                                                    "path": "provider",
-                                                    "label": "Provider",
-                                                    "format": "party"
-                                                }
-                                            ]
-                                        },
-                                        "GLK_SuperValidatorRightsOwner": {
-                                            "label": "super validator",
-                                            "fields": [
-                                                {
-                                                    "path": "svName",
-                                                    "label": "SV",
-                                                    "format": "string"
-                                                }
-                                            ]
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
+                    "format": "raw"
                 },
                 {
                     "path": "expiresAt",
@@ -141,7 +48,6 @@
             {
                 "choice": "TransferInstruction_Reject",
                 "interface": {
-                    "packageId": "55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281",
                     "moduleName": "Splice.Api.Token.TransferInstructionV1",
                     "entityName": "TransferInstruction"
                 },
@@ -163,7 +69,6 @@
             {
                 "choice": "TransferInstruction_Reject",
                 "interface": {
-                    "packageId": "29317e3b7b165d2bbf16721bcca0ec4869e53eddb2738bddf790d61af28e0099",
                     "moduleName": "Splice.Api.Token.TransferInstructionV2",
                     "entityName": "TransferInstruction"
                 },

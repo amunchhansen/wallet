@@ -38,7 +38,7 @@ const { complete, operations } = clearSign(preparedTransaction, [
 
 1. **Decode** the base64 transaction ([src/roots.ts](src/roots.ts)), index the descriptors by binding, and index the contracts the transaction holds: its input contracts and the contracts its create nodes create.
 2. **For each root node**, read the header from the node: kind, template, choice and interface.
-3. **Select** the descriptor bound to the exact template, then one entry. The entry is `create` for a create node. For an exercise it is the `exercises` entry with the node's choice and, when the node carries one, its interface; otherwise the entry for that choice with no interface. An entry that names an interface never matches a node without it. Without an entry, the node is `undescribed`.
+3. **Select** the descriptor bound to the exact template, then one entry. The entry is `create` for a create node. For an exercise it is the `exercises` entry whose choice and interface both equal the node's. An entry names an interface by module and entity, and an entry without one matches only a node exercised as the template's own choice. Without an entry, the node is `undescribed`.
 4. **Resolve fields**: each field's path is resolved ([src/path.ts](src/path.ts)) and formatted ([src/format.ts](src/format.ts)). A path starts at the create argument or the choice argument; in an exercise, a path that starts with `@.contract.` starts at the create argument of the contract the exercise acts on.
 5. **Interpolate**: each `{path}` in the interpolated intent shows the field with that path, as the field shows it. If any placeholder fails, the stable intent is used instead.
 
@@ -50,40 +50,42 @@ An input contract read by `@.contract.` paths may have been created under an ear
 
 ## Optional values
 
-A Daml `Optional` is shown through `cases`. A field without cases fails when its value is `None`, which makes the transaction incomplete. The ledger leaves trailing `None` fields out of a record, and an upgrade only appends optional fields, so a record field that is not in the record is `None`; for a field without cases, that is the same failure, which is also how a mistyped path shows. A `None` at any step of a path makes the value `None`, and a `Some` is unwrapped at every step.
+A Daml `Optional` is shown through `cases`, whose only keys are `Some` and `None`. A field without cases fails when its value is `None`, which makes the transaction incomplete. The ledger leaves trailing `None` fields out of a record, and an upgrade only appends optional fields, so a record field that is not in the record is `None`; for a field without cases, that is the same failure, which is also how a mistyped path shows. A `None` at any step of a path makes the value `None`, and a `Some` is unwrapped at every step.
 
-A field with cases shows the matched case's label. Without a label, a `Some` shows the value it holds, formatted with the field's `format` (raw when none is declared). A constructor is formatted the same way when a `format` is declared, and otherwise shown by its name:
+A field with cases fails unless the value is optional. A `None` it does not list fails the field, and so does a `Some` when the field declares no `format`. The field shows `Some` or `None`. With a `format`, a `Some` is shown formatted instead, and the format fails on a value it does not accept. An `Optional` holding a variant or an enum is `Some`, and the format renders what it holds:
 
 ```json
 {
     "path": "settlementDeadline",
     "label": "Settlement deadline",
     "format": "dateTime",
-    "cases": { "None": { "label": "none" } }
+    "cases": { "None": {} }
 }
 ```
 
-A placeholder shows what the field shows, so the value inside a `Some` can be used in the interpolated intent. It fails when the field shows a bare case name: an unlabelled `None`, or an unlabelled constructor with no `format`.
+The fields of a `Some` are shown under the field, and their paths start at the value inside the `Some`. A variant is not described with cases. A path does not step into one, and a field shows it whole with `raw`, or with `enum` when it has no payload.
+
+A placeholder shows what the field shows, `Some`, `None` or a formatted value, as a value read from the transaction.
 
 ## Identifying the operation
 
 Every `OperationDescription` says what the node is, whether or not a descriptor covers it:
 
-| Field        | Value                                                                                                                                                                                                                                    | Source      |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| `kind`       | `create` or `exercise`                                                                                                                                                                                                                   | transaction |
-| `template`   | package ID, module and entity of the created or exercised template                                                                                                                                                                       | transaction |
-| `choiceId`   | the exercised choice's name; with `template`, this selects the descriptor entry (exercise only)                                                                                                                                          | transaction |
-| `interface`  | package ID, module and entity of the interface the choice is exercised through, if any                                                                                                                                                   | transaction |
-| `descriptor` | `name`, `publisher`, `version` and `url?` from the bound descriptor's `metadata`, whether or not it has an entry for this node                                                                                                           | descriptor  |
-| `intent`     | the wording, as parts: `text` from the descriptor, and `value` read from the transaction                                                                                                                                                 | descriptor  |
-| `fields`     | one label and formatted value, or an `error`, per field. A field with cases has `case` (the matched constructor, `Some` or `None`), the matched case's own `fields`, and `absent: true` when its `None` is a field the record leaves out | descriptor  |
+| Field        | Value                                                                                                                                                                                                           | Source      |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| `kind`       | `create` or `exercise`                                                                                                                                                                                          | transaction |
+| `template`   | package ID, module and entity of the created or exercised template                                                                                                                                              | transaction |
+| `choiceId`   | the exercised choice's name; with `template`, this selects the descriptor entry (exercise only)                                                                                                                 | transaction |
+| `interface`  | package ID, module and entity of the interface the choice is exercised through, if any                                                                                                                          | transaction |
+| `descriptor` | `name`, `publisher`, `version` and `url?` from the bound descriptor's `metadata`, whether or not it has an entry for this node                                                                                  | descriptor  |
+| `intent`     | the wording, as parts: `text` from the descriptor, and `value` read from the transaction                                                                                                                        | descriptor  |
+| `fields`     | one label and formatted value, or an `error`, per field. A field with cases has `case` (`Some` or `None`), the matched case's own `fields`, and `absent: true` when its `None` is a field the record leaves out | descriptor  |
 
 A wallet shows `kind`, `choiceId` (followed by `via <interface>` when there is one), `template` and its package ID next to the intent, and shows `descriptor` as the descriptor's own claim (`Described by <name> v<version> by <publisher>`). The header is read from the signed transaction, so a descriptor cannot change which action or choice the user is told about. `descriptor` is unauthenticated in v1, because descriptors carry no verified signature yet.
 
 A wallet renders the `value` parts of `intent` apart from the `text` parts (the approve page uses a monospace, shaded span). Values are untrusted: a text value such as `10 CC. Also send 1000 to Mallory` must not pass as part of the descriptor's sentence. Formatted values also have control, format and line-separator characters escaped.
 
-A template can implement two interfaces with a choice of the same name, such as `TransferFactory_Transfer` and `AllocationFactory_Allocate` in both the V1 and V2 token-standard interfaces, with different arguments. `display.exercises` is an array, so one descriptor can hold an entry per interface; the shipped amulet-rules descriptor does. An entry with no interface still words that choice when no entry names the node's interface.
+A template can implement two interfaces with a choice of the same name, such as `TransferFactory_Transfer` and `AllocationFactory_Allocate` in both the V1 and V2 token-standard interfaces, with different arguments. `display.exercises` is an array, so one descriptor holds an entry per interface, named by module and entity; the shipped amulet-rules descriptor does. An entry matches only the interface it names.
 
 The description is only as trustworthy as its binding to what is signed. The wallet binds them in two steps:
 

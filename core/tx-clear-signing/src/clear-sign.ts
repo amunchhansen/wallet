@@ -45,8 +45,8 @@ export interface DescribedField {
      */
     absent?: true
     /**
-     * For a field with cases: the shape of its value (a variant constructor, `Some` or `None`). `value`
-     * is that case's label; without one, a `Some` shows the value it holds and any other case its name.
+     * For a field with cases: `Some` or `None`. `value` is that name, or, when the field declares a
+     * format, the formatted `Some`.
      */
     case?: string
     /** The fields of the matched case, resolved against the value the case matched. */
@@ -76,7 +76,9 @@ export interface DescriptorInfo {
  * `kind`, `template`, `choiceId` and `interface` are read from the transaction, never from the
  * descriptor, so a descriptor cannot change what the user is told is being done. Only `intent`,
  * `fields` and `descriptor` come from the descriptor. The descriptor is chosen by `template`, and
- * its entry by the kind and, for an exercise, by `choiceId` and `interface`.
+ * its entry by the kind and, for an exercise, by `choiceId` and `interface`. An entry matches only
+ * when its interface equals the node's, module and entity; an entry without one matches only a node
+ * without one.
  */
 export interface OperationDescription {
     nodeId: string
@@ -247,24 +249,30 @@ function selectOperation(
 }
 
 /**
- * The exercise entry for a node. An entry that names the node's interface wins; otherwise the entry
- * for the choice with no interface. An entry that names an interface never matches a node without it.
+ * The exercise entry for a node. The choice and the interface must both match. An entry without an
+ * interface matches only a node exercised as the template's own choice.
  */
 function exerciseEntry(
     exercises: readonly Exercise[] | undefined,
     choiceId: string,
     iface: TemplateRef | undefined
 ): Exercise | undefined {
-    const sameChoice = (exercises ?? []).filter((e) => e.choice === choiceId)
-    if (iface) {
-        const exact = sameChoice.find(
-            (e) =>
-                e.interface !== undefined &&
-                templateKey(e.interface) === templateKey(iface)
-        )
-        if (exact) return exact
+    return (exercises ?? []).find(
+        (e) => e.choice === choiceId && sameInterface(e.interface, iface)
+    )
+}
+
+function sameInterface(
+    entry: { moduleName: string; entityName: string } | undefined,
+    node: TemplateRef | undefined
+): boolean {
+    if (entry === undefined || node === undefined) {
+        return entry === undefined && node === undefined
     }
-    return sameChoice.find((e) => e.interface === undefined)
+    return (
+        entry.moduleName === node.moduleName &&
+        entry.entityName === node.entityName
+    )
 }
 
 function descriptorInfo({ metadata }: Descriptor): DescriptorInfo {
@@ -292,7 +300,7 @@ function describeOperation(
             (segment): IntentPart =>
                 segment.kind === 'text'
                     ? segment
-                    : valuePart(segment.path, op, fields)
+                    : valuePart(segment.path, fields)
         )
         return { status: 'described', intent, fields }
     } catch (err) {
@@ -311,8 +319,9 @@ function startOf(path: string, selected: Selected): Value | undefined {
 
 /**
  * Resolves and formats a field. A field without cases fails on `None`, whether the ledger kept it or
- * left it out: an optional value is shown through cases. A field with cases shows its matched case's
- * label, or the value formatted with `format` when the case has none.
+ * left it out: an optional value is shown through cases. A field with cases fails unless the value is
+ * optional, and on a `Some` or `None` it does not list, except a `Some` that its declared format
+ * accepts. It shows `Some` or `None`, or that formatted value.
  */
 function describeField(
     field: Field,
@@ -325,14 +334,23 @@ function describeField(
         if (field.cases) {
             const shape = shapeOf(resolved)
             const matched = field.cases[shape.name]
+            const formatted =
+                shape.name !== 'None' && field.format !== undefined
+            if (!matched && !formatted) {
+                throw shape.name === 'None'
+                    ? noneError(field, resolved)
+                    : new PathError(
+                          `'${field.path}' has no case '${shape.name}'`
+                      )
+            }
             return {
                 label,
                 path: field.path,
-                value:
-                    matched?.label ??
-                    shapeValue(resolved.value, shape, field, enums),
+                value: formatted
+                    ? formatValue(resolved.value, field, enums)
+                    : shape.name,
                 case: shape.name,
-                ...declaredFormat(field),
+                ...(formatted && declaredFormat(field)),
                 ...(matched?.fields && {
                     fields: matched.fields.map((f) =>
                         describeField(f, shape.payload, enums)
@@ -343,13 +361,7 @@ function describeField(
                 }),
             }
         }
-        if (isNone(resolved.value)) {
-            throw new PathError(
-                resolved.absentField === undefined
-                    ? `'${field.path}' is None`
-                    : `'${resolved.absentField}' is not in the transaction`
-            )
-        }
+        if (isNone(resolved.value)) throw noneError(field, resolved)
         return {
             label,
             path: field.path,
@@ -369,31 +381,26 @@ function describeField(
     }
 }
 
-// A placeholder shows the field with the same path, as the field shows it. It fails when the field
-// failed, and when the field shows a bare case name: an unlabelled None, or an unlabelled constructor
-// with no format.
-function valuePart(
-    path: string,
-    op: Operation,
-    fields: DescribedField[]
-): IntentPart {
-    const i = (op.fields ?? []).findIndex((f) => f.path === path)
-    const field = op.fields?.[i]
-    const described = fields[i]
-    if (!field || described?.value === undefined) {
+// A placeholder shows the field with the same path, as the field shows it.
+function valuePart(path: string, fields: DescribedField[]): IntentPart {
+    const described = fields.find((f) => f.path === path)
+    if (described?.value === undefined) {
         throw new PathError(`'${path}' has no value`)
-    }
-    if (bareCaseName(field, described.case)) {
-        throw new PathError(
-            `'${path}' has no case label for '${described.case}'`
-        )
     }
     return {
         kind: 'value',
         path,
         value: described.value,
-        ...declaredFormat(field),
+        ...(described.format && { format: described.format }),
     }
+}
+
+function noneError(field: Field, resolved: Resolved): PathError {
+    return new PathError(
+        resolved.absentField === undefined
+            ? `'${field.path}' is None`
+            : `'${resolved.absentField}' is not in the transaction`
+    )
 }
 
 interface Shape {
@@ -401,43 +408,15 @@ interface Shape {
     payload?: Value
 }
 
-// The shape a field with cases is matched on, and the value its case fields start at. Some is
-// unwrapped first, so an Optional holding a variant is matched by the variant's constructor.
+// The shape a field with cases is matched on, and the value its case fields start at. Cases apply
+// only to an optional value. Some is already unwrapped, so an Optional holding a variant or an enum
+// is Some, and the case fields start at what it holds.
 function shapeOf(resolved: Resolved): Shape {
     const { value } = resolved
-    const sum = value.sum
     if (isNone(value)) return { name: 'None' }
-    if (sum.oneofKind === 'variant') {
-        return {
-            name: sum.variant.constructor,
-            ...(sum.variant.value && { payload: sum.variant.value }),
-        }
-    }
-    if (sum.oneofKind === 'enum') return { name: sum.enum.constructor }
     if (resolved.some) return { name: 'Some', payload: value }
-    throw new PathError(`cases applied to ${describeKind(value)}`)
-}
-
-// What a field with cases shows when the matched case has no label. A Some is the value it holds,
-// formatted with the field's format (raw when it declares none). A constructor is formatted the same
-// way when the field declares a format, and otherwise shown by its name.
-function shapeValue(
-    value: Value,
-    shape: Shape,
-    field: Field,
-    enums: EnumTables
-): string {
-    return shape.name === 'Some' || field.format !== undefined
-        ? formatValue(value, field, enums)
-        : shape.name
-}
-
-function bareCaseName(field: Field, name: string | undefined): boolean {
-    return (
-        field.cases !== undefined &&
-        field.cases[name ?? '']?.label === undefined &&
-        name !== 'Some' &&
-        field.format === undefined
+    throw new PathError(
+        `cases applied to ${describeKind(value)}, which is not optional`
     )
 }
 

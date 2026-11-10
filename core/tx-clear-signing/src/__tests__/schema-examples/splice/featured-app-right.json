@@ -8,7 +8,7 @@
         }
     },
     "metadata": {
-        "version": "1.3.0",
+        "version": "1.5.0",
         "publisher": "<splice publisher>",
         "name": "Featured app right",
         "enums": {
@@ -37,9 +37,7 @@
                         "$ref": "$.metadata.enums.appKind"
                     },
                     "cases": {
-                        "None": {
-                            "label": "not set"
-                        }
+                        "None": {}
                     }
                 },
                 {
@@ -47,18 +45,15 @@
                     "label": "Activity weight",
                     "format": "number",
                     "cases": {
-                        "None": {
-                            "label": "default"
-                        }
+                        "None": {}
                     }
                 },
                 {
                     "path": "opsParties",
                     "label": "Operational parties",
+                    "format": "raw",
                     "cases": {
-                        "None": {
-                            "label": "none"
-                        }
+                        "None": {}
                     }
                 },
                 {
@@ -66,9 +61,7 @@
                     "label": "Number of operational parties",
                     "format": "number",
                     "cases": {
-                        "None": {
-                            "label": "none"
-                        }
+                        "None": {}
                     }
                 }
             ]
@@ -76,6 +69,36 @@
         "exercises": [
             {
                 "choice": "FeaturedAppRight_CreateActivityMarker",
+                "interface": {
+                    "moduleName": "Splice.Api.FeaturedAppRightV1",
+                    "entityName": "FeaturedAppRight"
+                },
+                "intent": "Record featured app activity",
+                "interpolatedIntent": "Record activity of {@.contract.provider} for {beneficiaries.length} beneficiaries",
+                "fields": [
+                    {
+                        "path": "@.contract.provider",
+                        "label": "Provider",
+                        "format": "party"
+                    },
+                    {
+                        "path": "beneficiaries.length",
+                        "label": "Number of beneficiaries",
+                        "format": "number"
+                    },
+                    {
+                        "path": "beneficiaries",
+                        "label": "Beneficiaries",
+                        "format": "raw"
+                    }
+                ]
+            },
+            {
+                "choice": "FeaturedAppRight_CreateActivityMarker",
+                "interface": {
+                    "moduleName": "Splice.Api.FeaturedAppRightV2",
+                    "entityName": "FeaturedAppRight"
+                },
                 "intent": "Record featured app activity",
                 "interpolatedIntent": "Record activity of {@.contract.provider} for {beneficiaries.length} beneficiaries",
                 "fields": [
@@ -99,9 +122,7 @@
                         "label": "Weight",
                         "format": "number",
                         "cases": {
-                            "None": {
-                                "label": "not given"
-                            }
+                            "None": {}
                         }
                     }
                 ]

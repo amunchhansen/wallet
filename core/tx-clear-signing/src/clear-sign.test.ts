@@ -233,27 +233,24 @@ describe('clearSign', () => {
             moduleName: 'HashVectors',
             entityName: 'Asset',
         }
-        const poke = (wording: string, iface?: typeof asset) => ({
+        const named = { moduleName: 'HashVectors', entityName: 'Asset' }
+        const poke = (
+            wording: string,
+            iface?: { moduleName: string; entityName: string }
+        ) => ({
             choice: 'Poke',
             ...(iface && { interface: iface }),
             intent: 'Poke',
             interpolatedIntent: `${wording} {@.contract.owner}`,
             fields: [{ path: '@.contract.owner', format: 'party' }],
         })
-        const both = vectorDescriptor('Plain', {
-            create: {
-                intent: 'Plain',
-                fields: [{ path: 'owner', format: 'party' }],
-            },
-            exercises: [
-                poke('Poke, by the template, the asset of'),
-                poke('Poke, through Asset, the asset of', asset),
-            ],
+        const throughAsset = vectorDescriptor('Plain', {
+            exercises: [poke('Poke, through Asset, the asset of', named)],
         })
 
-        it('prefers the entry for that interface', () => {
+        it('uses the entry for that interface', () => {
             const [op] = clearSign(exerciseInterface.preparedTransaction, [
-                both,
+                throughAsset,
             ]).operations
             expect(op).toMatchObject({
                 choiceId: 'Poke',
@@ -265,22 +262,23 @@ describe('clearSign', () => {
             )
         })
 
-        it('uses the entry with no interface when none names the interface', () => {
+        it('does not match an entry that names no interface', () => {
             const plain = vectorDescriptor('Plain', {
                 exercises: [poke('Poke, by the template, the asset of')],
             })
             const [op] = clearSign(exerciseInterface.preparedTransaction, [
                 plain,
             ]).operations
-            expect(intentText(op)).toBe(
-                `Poke, by the template, the asset of ${OWNER}`
-            )
+            expect(op).toMatchObject({ status: 'undescribed' })
         })
 
-        it('does not use an entry for another choice', () => {
+        it('does not match an entry for another interface', () => {
             const other = vectorDescriptor('Plain', {
                 exercises: [
-                    { choice: 'Other', intent: 'Other', interface: asset },
+                    poke('Poke, through Other, the asset of', {
+                        moduleName: 'HashVectors',
+                        entityName: 'Other',
+                    }),
                 ],
             })
             const [op] = clearSign(exerciseInterface.preparedTransaction, [
@@ -298,7 +296,7 @@ describe('clearSign', () => {
                             ? {
                                   ...entry,
                                   interface: {
-                                      ...pingJson.context.template,
+                                      moduleName: 'Canton.Internal.Ping',
                                       entityName: 'Asset',
                                   },
                               }
@@ -309,7 +307,6 @@ describe('clearSign', () => {
             const [op] = clearSign(encode(exercisePing()), [
                 viaAsset,
             ]).operations
-            // Respond is not exercised through an interface, so the Asset entry does not apply.
             expect(op).toMatchObject({
                 status: 'undescribed',
                 descriptor: PING_DESCRIPTOR,
@@ -500,6 +497,7 @@ describe('clearSign', () => {
                             path: 'values.variantValue.Circle',
                             format: 'number',
                         },
+                        { path: 'values.variantValue', format: 'raw' },
                         {
                             path: 'values.enumValue',
                             format: 'enum',
@@ -530,7 +528,8 @@ describe('clearSign', () => {
             '{"alpha":"2","zeta":"1"}',
             '[["1","one"],["3","three"]]',
             'pair',
-            '1.5000000000',
+            "'Circle' applied to variant 'Circle'; a variant is shown whole",
+            '{"Circle":"1.5000000000"}',
             'green',
             '{"name":"pair","count":"2"}',
             '()',
@@ -637,53 +636,45 @@ describe('cases', () => {
         return clearSign(allValues.preparedTransaction, [descriptor])
     }
 
-    it('shows the matched case label and its fields, resolved against the payload', () => {
+    it('shows a Some and its fields, and fails cases on a value that is not optional', () => {
         const result = describeAllKinds(
             [
-                {
-                    path: 'values',
-                    label: 'Values',
-                    cases: { Some: { label: 'unused' } },
-                },
+                { path: 'values', label: 'Values', cases: { Some: {} } },
                 {
                     path: 'values.variantValue',
                     label: 'Shape',
-                    cases: {
-                        Circle: { label: 'a circle' },
-                        Square: { label: 'a square' },
-                    },
+                    cases: { Some: {}, None: {} },
                 },
                 {
                     path: 'values.optionalValue',
                     label: 'Optional',
                     cases: {
-                        Some: {
-                            label: 'set',
-                            fields: [{ path: 'x', label: 'Inner' }],
-                        },
+                        Some: { fields: [{ path: 'x', label: 'Inner' }] },
                     },
                 },
             ],
-            'It is {values.variantValue}'
+            'It is {values.optionalValue}'
         )
         const [op] = result.operations
-        expect(intentText(op)).toBe('It is a circle')
+        // The placeholder names the optional, which resolved. The nested field's error makes the
+        // transaction incomplete without replacing the sentence.
+        expect(op?.status).toBe('described')
+        expect(intentText(op)).toBe('It is Some')
         expect(op?.fields).toEqual([
             {
                 label: 'Values',
                 path: 'values',
-                error: 'cases applied to record',
+                error: 'cases applied to record, which is not optional',
             },
             {
                 label: 'Shape',
                 path: 'values.variantValue',
-                value: 'a circle',
-                case: 'Circle',
+                error: 'cases applied to variant, which is not optional',
             },
             {
                 label: 'Optional',
                 path: 'values.optionalValue',
-                value: 'set',
+                value: 'Some',
                 case: 'Some',
                 fields: [
                     {
@@ -698,22 +689,23 @@ describe('cases', () => {
         expect(result.complete).toBe(false)
     })
 
-    it('shows an optional through cases: a Some without a label as its value, and a missing field as None', () => {
+    it('shows an optional through cases: a Some formatted, and a missing field as None', () => {
         const result = describeAllKinds(
             [
                 {
                     path: 'values.optionalValue',
                     label: 'Optional',
                     format: 'number',
-                    cases: { None: { label: 'not set' } },
+                    cases: { None: {} },
                 },
                 {
                     path: 'values.missingValue',
                     label: 'Missing',
-                    cases: { None: { label: 'not set' } },
+                    format: 'number',
+                    cases: { None: {} },
                 },
             ],
-            'Missing is {values.missingValue}'
+            'It is {values.optionalValue}; missing is {values.missingValue}'
         )
         const [op] = result.operations
         expect(op?.fields).toEqual([
@@ -724,32 +716,27 @@ describe('cases', () => {
                 case: 'Some',
                 format: 'number',
             },
+            // None is shown by its name, so it carries no format
             {
                 label: 'Missing',
                 path: 'values.missingValue',
-                value: 'not set',
+                value: 'None',
                 case: 'None',
                 absent: true,
             },
         ])
-        expect(intentText(op)).toBe('Missing is not set')
+        expect(intentText(op)).toBe('It is 7; missing is None')
+        expect(op?.intent[1]).toMatchObject({
+            kind: 'value',
+            value: '7',
+            format: 'number',
+        })
+        expect(op?.intent[3]).toEqual({
+            kind: 'value',
+            path: 'values.missingValue',
+            value: 'None',
+        })
         expect(result.complete).toBe(true)
-    })
-
-    it('uses the format for a Some without a label, including in the sentence', () => {
-        const result = describeAllKinds(
-            [
-                {
-                    path: 'values.optionalValue',
-                    format: 'number',
-                    cases: { None: { label: 'not set' } },
-                },
-            ],
-            'It is {values.optionalValue}'
-        )
-        const [op] = result.operations
-        expect(op?.status).toBe('described')
-        expect(intentText(op)).toBe('It is 7')
     })
 
     it('fails a Some whose format does not accept the value', () => {
@@ -757,7 +744,7 @@ describe('cases', () => {
             {
                 path: 'values.optionalValue',
                 format: 'string',
-                cases: { None: { label: 'not set' } },
+                cases: { None: {} },
             },
         ])
         expect(result.operations[0]?.fields[0]?.error).toBe(
@@ -766,38 +753,51 @@ describe('cases', () => {
         expect(result.complete).toBe(false)
     })
 
-    it('falls back when a placeholder names an unlabelled None', () => {
+    it('fails on a Some the field does not list, and falls back in the sentence', () => {
         const result = describeAllKinds(
             [
-                {
-                    path: 'values.missingValue',
-                    cases: { Some: { label: 'set' } },
-                },
+                { path: 'values.variantValue', cases: { None: {} } },
+                { path: 'values.missingValue', cases: { Some: {} } },
+                { path: 'values.optionalValue', cases: { None: {} } },
             ],
-            'Missing is {values.missingValue}'
-        )
-        expect(result.operations[0]?.status).toBe('fallback')
-        expect(result.operations[0]?.fields[0]).toMatchObject({
-            value: 'None',
-            case: 'None',
-            absent: true,
-        })
-    })
-
-    it('shows the case name when no case matches, and keeps it out of the sentence', () => {
-        const result = describeAllKinds(
-            [
-                {
-                    path: 'values.variantValue',
-                    label: 'Shape',
-                    cases: { Square: { label: 'a square' } },
-                },
-            ],
-            'It is {values.variantValue}'
+            'It is {values.optionalValue}'
         )
         const [op] = result.operations
         expect(op?.status).toBe('fallback')
-        expect(op?.fields[0]).toMatchObject({ value: 'Circle', case: 'Circle' })
+        expect(op?.fields.map((f) => f.error)).toEqual([
+            'cases applied to variant, which is not optional',
+            "'missingValue' is not in the transaction",
+            // Without a format, a Some is listed like any other shape
+            "'values.optionalValue' has no case 'Some'",
+        ])
         expect(result.complete).toBe(false)
+    })
+
+    it('fails cases on an enum that is not optional', () => {
+        const descriptor = vectorDescriptor(
+            'AllKinds',
+            {
+                create: {
+                    intent: 'All kinds',
+                    interpolatedIntent: 'It is {values.enumValue}',
+                    fields: [
+                        {
+                            path: 'values.enumValue',
+                            format: 'enum',
+                            params: { $ref: '$.metadata.enums.color' },
+                            cases: { None: {} },
+                        },
+                    ],
+                },
+            },
+            { color: { Red: 'red', Green: 'green' } }
+        )
+        const [op] = clearSign(allValues.preparedTransaction, [
+            descriptor,
+        ]).operations
+        expect(op?.status).toBe('fallback')
+        expect(op?.fields[0]?.error).toBe(
+            'cases applied to enum, which is not optional'
+        )
     })
 })

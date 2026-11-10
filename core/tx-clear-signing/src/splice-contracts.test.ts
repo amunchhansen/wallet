@@ -85,69 +85,72 @@ describe('captured fixtures', () => {
 })
 
 describe('governance locks', () => {
-    it('shows the fields of a vesting lock through nested cases', () => {
+    it('shows a vesting lock whole, with its constructor as the raw key', () => {
         const op = describeCaptured('gl-substitution-create-fa-vesting')
         expect(op.status).toBe('described')
         expect(intentText(op)).toBe(
-            `Propose substituting 250.0000000000 of the vesting lock of ${ALICE}, proposed by ${BOB}`
+            `Propose substituting 250.0000000000 of the governance lock of ${ALICE}, proposed by ${BOB}`
         )
         expect(fields(op)).toEqual({
             Amount: '250.0000000000',
             'Lock owner': ALICE,
             'Proposed by': BOB,
-            'Lock type': 'vesting lock',
-            'Lock type › Lock for': 'featured app',
-            'Lock type › Lock for › Provider': PROVIDER,
-            'Lock type › Vesting period': '60d',
-            'Lock type › Vesting ends': '2027-01-08T16:29:55Z',
+            'Lock type': expect.any(String),
             Funding: expect.stringMatching(/^003dc46d/),
             Expires: '2026-11-16T16:29:58Z',
             // A trailing None field is not in the prepared transaction; its None case is marked as inferred
-            'First proposal': 'none (absent)',
+            'First proposal': 'None (absent)',
         })
-        const lockType = op.fields.find((f) => f.label === 'Lock type')
-        expect(lockType?.case).toBe('GLS_VestingLock')
+        expect(JSON.parse(fields(op)['Lock type']!)).toEqual({
+            GLS_VestingLock: {
+                kind: { GLK_FeaturedApp: { provider: PROVIDER } },
+                vestingPeriod: '60d',
+                endTime: '2027-01-08T16:29:55Z',
+            },
+        })
     })
 
-    it('shows only the fields of the full lock case, and a non-trailing None', () => {
+    it('shows a full lock whole, and a non-trailing None', () => {
         const op = describeCaptured('gl-substitution-create-sv-full')
         expect(op.status).toBe('described')
         expect(intentText(op)).toBe(
-            `Propose substituting 250.0000000000 of the full lock of ${ALICE}, proposed by ${ALICE}`
+            `Propose substituting 250.0000000000 of the governance lock of ${ALICE}, proposed by ${ALICE}`
         )
         const shown = fields(op)
-        expect(shown).toMatchObject({
-            'Lock type': 'full lock',
-            'Lock type › Lock for': 'super validator',
-            'Lock type › Lock for › SV': 'sv-1',
-            Funding: 'none',
+        expect(shown.Funding).toBe('None')
+        expect(JSON.parse(shown['Lock type']!)).toEqual({
+            GLS_FullLock: {
+                kind: { GLK_SuperValidatorRightsOwner: { svName: 'sv-1' } },
+            },
         })
-        expect(shown).not.toHaveProperty(['Lock type › Vesting period'])
     })
 
     it('describes a lock with a contract key', () => {
         const op = describeCaptured('gl-lock-create')
         expect(intentText(op)).toBe(
-            `Create a full lock of 10000.0000000000 for ${ALICE}`
+            `Create a governance lock of 10000.0000000000 for ${ALICE}`
         )
-        expect(fields(op)).toMatchObject({
-            'Lock type': 'full lock',
-            'Lock type › Lock for': 'provisional featured app',
-            'Lock type › Lock for › Provider': PROVIDER,
+        expect(JSON.parse(fields(op)['Lock type']!)).toEqual({
+            GLS_FullLock: {
+                kind: { GLK_ProvisionalFeaturedApp: { provider: PROVIDER } },
+            },
         })
     })
 
     it('keeps source.owner apart from receiver', () => {
         const op = describeCaptured('gl-transfer-create')
         expect(intentText(op)).toBe(
-            `Transfer 100.0000000000 of the vesting locks of ${ALICE} to ${BOB}`
+            `Transfer 100.0000000000 of the governance locks of ${ALICE} to ${BOB}`
         )
+        expect(Object.keys(JSON.parse(fields(op)['Lock type']!))).toEqual([
+            'GLS_VestingLock',
+        ])
     })
 
     it('words V1 and V2 accepts the same, each from its own entry', () => {
         const v1 = describeOne(simulated['gl-substitution-accept-v1']())
         const v2 = describeOne(simulated['gl-substitution-accept-v2']())
-        const sentence = `Accept the substitution of 250.0000000000 of the vesting lock of ${ALICE}, proposed by ${BOB}`
+        const sentence = `Accept the substitution of 250.0000000000 of the governance lock of ${ALICE}, proposed by ${BOB}`
         expect([v1.status, v2.status]).toEqual(['described', 'described'])
         expect(intentText(v1)).toBe(sentence)
         expect(intentText(v2)).toBe(sentence)
@@ -257,64 +260,71 @@ describe('V1 and V2 AllocationFactory_Allocate each have their own entry', () =>
 })
 
 describe('DSO governance', () => {
-    it('reaches seven levels into a SetConfig vote', () => {
+    it('shows a SetConfig vote whole, with the action constructor in the raw value', () => {
         const op = describeCaptured('dso-request-vote-set-config')
         expect(op.status).toBe('described')
         expect(intentText(op)).toBe(
-            `Request a vote by ${ALICE} on the DSO rules: Raise maxTextLength`
+            `Request a vote by ${ALICE}: Raise maxTextLength`
         )
-        const action = 'Votes on › Action'
         expect(fields(op)).toMatchObject({
             'Voting period': '3d',
-            'Effective at': 'not set (absent)',
-            'Votes on': 'the DSO rules',
-            [action]: 'change the DSO rules configuration',
-            [`${action} › New max text length`]: '2048',
-            [`${action} › Current configuration`]: 'set',
-            [`${action} › Current configuration › Max text length`]: '1024',
-            [`${action} › New vote cooldown`]: '1m',
-            [`${action} › CIP-0104 switch-over`]: '2026-11-19T16:29:56Z',
+            'Effective at': 'None (absent)',
         })
+        const action = JSON.parse(fields(op)['Votes on']!)
+        const setConfig = action.ARC_DsoRules.dsoAction.SRARC_SetConfig
+        expect(setConfig.newConfig.maxTextLength).toBe('2048')
+        expect(setConfig.baseConfig.maxTextLength).toBe('1024')
+        expect(setConfig.newConfig.voteCooldownTime).toBe('1m')
+        expect(
+            setConfig.newConfig.svOperationsSwitchOverTimes['cip-0104']
+        ).toBe('2026-11-19T16:29:56Z')
     })
 
-    it('reads tuples, Sets and enums in an amulet config schedule', () => {
+    it('shows tuples, Sets and an enum inside an amulet config schedule shown whole', () => {
         const op = describeCaptured('dso-request-vote-amulet-schedule')
         expect(op.status).toBe('described')
         expect(intentText(op)).toBe(
-            `Request a vote by ${ALICE} on the amulet rules: New traffic price`
+            `Request a vote by ${ALICE}: New traffic price`
         )
-        const action = 'Votes on › Action'
-        expect(fields(op)).toMatchObject({
-            'Voting period': 'default',
-            'Votes on': 'the amulet rules',
-            [action]: 'schedule an amulet configuration',
-            [`${action} › Extra traffic price`]: '16.6700000000',
-            [`${action} › Burst window`]: '20m',
-            [`${action} › Required synchronizers`]:
-                '{"map":[["global-domain::1220c0ffee","()"]]}',
-            [`${action} › Transfer fee steps`]:
-                '[{"_1":"100.0000000000","_2":"0.0000000000"},{"_1":"1000.0000000000","_2":"0.0000000000"}]',
-            [`${action} › Reward configuration`]: 'set',
-            [`${action} › Reward configuration › Minting`]:
-                'Traffic-based app rewards',
-            [`${action} › Reward configuration › DSO app activity weight`]:
-                'not set (absent)',
+        expect(fields(op)['Voting period']).toBe('None')
+        const action = JSON.parse(fields(op)['Votes on']!)
+        const schedule =
+            action.ARC_AmuletRules.amuletRulesAction
+                .CRARC_AddFutureAmuletConfigSchedule
+        const config = schedule.newScheduleItem._2
+        expect(config.decentralizedSynchronizer.fees.extraTrafficPrice).toBe(
+            '16.6700000000'
+        )
+        expect(
+            config.decentralizedSynchronizer.fees.baseRateTrafficLimits
+                .burstWindow
+        ).toBe('20m')
+        expect(config.decentralizedSynchronizer.requiredSynchronizers).toEqual({
+            map: [['global-domain::1220c0ffee', '()']],
         })
+        expect(config.transferConfig.transferFee.steps).toEqual([
+            { _1: '100.0000000000', _2: '0.0000000000' },
+            { _1: '1000.0000000000', _2: '0.0000000000' },
+        ])
+        // raw shows the enum constructor, not the descriptor's enum table
+        expect(config.rewardConfig.mintingVersion).toBe(
+            'RewardVersion_TrafficBasedAppRewards'
+        )
     })
 
     it('keeps sibling optional configs with the same field names apart', () => {
         const op = describeCaptured('dso-set-synchronizer-node-config')
         expect(op.status).toBe('described')
         expect(fields(op)).toMatchObject({
-            Sequencer: 'set',
+            Sequencer: 'Some',
             'Sequencer › URL': 'https://sequencer.example.com',
             'Sequencer › Migration': '3',
-            'Legacy sequencer': 'set',
+            'Legacy sequencer': 'Some',
             'Legacy sequencer › URL': 'https://legacy-sequencer.example.com',
             'Legacy sequencer › Migration': '2',
-            'Sequencer identity': 'set',
-            'Sequencer identity › Available after': 'not set (absent)',
-            Mediator: 'set',
+            'Sequencer identity': 'Some',
+            'Sequencer identity › Available after': 'None (absent)',
+            Mediator: 'Some',
             'Mediator › Mediator ID': 'MED::current',
             'Scan › Public URL': 'https://scan.example.com',
             'Governance keys': '1',
@@ -325,16 +335,14 @@ describe('DSO governance', () => {
 
     it('shows a GenMap keyed by text only as a whole', () => {
         const op = describeCaptured('vote-request-create')
-        expect(intentText(op)).toMatch(
-            /^Vote by sv-1 on the DSO rules, open until /
-        )
-        expect(fields(op)).toMatchObject({
-            'Votes on': 'the DSO rules',
-            'Votes on › Action': 'change the DSO rules configuration',
-            'Votes on › Action › New max text length': '2048',
-        })
+        expect(intentText(op)).toMatch(/^Vote by sv-1, open until /)
+        const action = JSON.parse(fields(op)['Votes on']!)
+        expect(
+            action.ARC_DsoRules.dsoAction.SRARC_SetConfig.newConfig
+                .maxTextLength
+        ).toBe('2048')
         expect(fields(op).Votes).toMatch(/^\[\["sv-1",\{"sv":/)
-        expect(fields(op).Tracking).toBe('none (absent)')
+        expect(fields(op).Tracking).toBe('None (absent)')
     })
 })
 
@@ -355,12 +363,16 @@ describe('wallet and apps', () => {
         })
     })
 
-    it('formats an optional enum and counts an optional list', () => {
+    it('formats an optional enum as Some, and counts an optional list', () => {
         const op = describeCaptured('featured-app-right-create')
         expect(fields(op)).toMatchObject({
             Kind: 'Asset mover',
             'Activity weight': '2.5000000000',
             'Number of operational parties': '1',
+        })
+        expect(op.fields.find((f) => f.label === 'Kind')).toMatchObject({
+            case: 'Some',
+            format: 'enum',
         })
     })
 
@@ -370,8 +382,7 @@ describe('wallet and apps', () => {
         expect(intentText(v1)).toBe(
             `Record activity of ${PROVIDER} for 2 beneficiaries`
         )
-        // V1 has no weight; V2 added it as an Optional, so V1 reads as its None case
-        expect(fields(v1).Weight).toBe('not given (absent)')
+        expect(fields(v1)).not.toHaveProperty('Weight')
         expect(fields(v2).Weight).toBe('3.0000000000')
     })
 
@@ -390,24 +401,31 @@ describe('wallet and apps', () => {
         )
     })
 
-    it('reads the label of a positional newtype, and shows each update type with its own fields', () => {
+    it('reads the label of a positional newtype, and shows each update whole', () => {
         const transfer = describeCaptured('balance-update-create-transfer')
         const netting = describeCaptured('balance-update-create-netting')
         expect(intentText(transfer)).toBe(
-            `Record a transfer in group flatmates of ${ALICE}`
+            `Record a balance update in group flatmates of ${ALICE}`
         )
         expect(intentText(netting)).toBe(
-            `Record a netting in group flatmates of ${ALICE}`
+            `Record a balance update in group flatmates of ${ALICE}`
         )
-        expect(fields(transfer)).toMatchObject({
-            Group: 'flatmates',
-            Update: 'transfer',
-            'Update › Sender': BOB,
-            'Update › Amount': '42.0000000000',
+        expect(fields(transfer).Group).toBe('flatmates')
+        expect(JSON.parse(fields(transfer).Update!)).toMatchObject({
+            Transfer: { sender: BOB, amount: '42.0000000000' },
         })
-        expect(fields(netting)).toMatchObject({
-            Update: 'netting',
-            'Update › Balance changes': `[["${ALICE}",[["${ALICE}","-5.0000000000"],["${BOB}","5.0000000000"]]]]`,
+        expect(JSON.parse(fields(netting).Update!)).toEqual({
+            Netting: {
+                balanceChanges: [
+                    [
+                        ALICE,
+                        [
+                            [ALICE, '-5.0000000000'],
+                            [BOB, '5.0000000000'],
+                        ],
+                    ],
+                ],
+            },
         })
     })
 
@@ -451,8 +469,8 @@ describe('wallet and apps', () => {
         expect(op.status).toBe('described')
         expect(fields(op)).toMatchObject({
             // The None case matches an Optional the ledger left out of the record
-            Description: 'none (absent)',
-            Metadata: 'none (absent)',
+            Description: 'None (absent)',
+            Metadata: 'None (absent)',
         })
         // An absent field is not a failure: the transaction is still completely described
         expect(clearSign(tx, spliceDescriptors).complete).toBe(true)

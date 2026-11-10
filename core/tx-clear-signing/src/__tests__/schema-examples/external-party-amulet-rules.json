@@ -8,7 +8,7 @@
         }
     },
     "metadata": {
-        "version": "2.2.0",
+        "version": "2.4.0",
         "publisher": "<splice publisher>",
         "name": "Amulet rules for external parties",
         "enums": {
@@ -34,7 +34,6 @@
             {
                 "choice": "TransferFactory_Transfer",
                 "interface": {
-                    "packageId": "55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281",
                     "moduleName": "Splice.Api.Token.TransferInstructionV1",
                     "entityName": "TransferFactory"
                 },
@@ -81,7 +80,6 @@
             {
                 "choice": "TransferFactory_Transfer",
                 "interface": {
-                    "packageId": "29317e3b7b165d2bbf16721bcca0ec4869e53eddb2738bddf790d61af28e0099",
                     "moduleName": "Splice.Api.Token.TransferInstructionV2",
                     "entityName": "TransferFactory"
                 },
@@ -138,7 +136,6 @@
             {
                 "choice": "AllocationFactory_Allocate",
                 "interface": {
-                    "packageId": "275064aacfe99cea72ee0c80563936129563776f67415ef9f13e4297eecbc520",
                     "moduleName": "Splice.Api.Token.AllocationInstructionV1",
                     "entityName": "AllocationFactory"
                 },
@@ -200,7 +197,6 @@
             {
                 "choice": "AllocationFactory_Allocate",
                 "interface": {
-                    "packageId": "9818a0b5b827109de03a04c8f6151cde9d1e7fe5123dbb2dfeb0e52d7271287c",
                     "moduleName": "Splice.Api.Token.AllocationInstructionV2",
                     "entityName": "AllocationFactory"
                 },
@@ -255,9 +251,7 @@
                         "label": "Settlement deadline",
                         "format": "dateTime",
                         "cases": {
-                            "None": {
-                                "label": "none"
-                            }
+                            "None": {}
                         }
                     },
                     {
