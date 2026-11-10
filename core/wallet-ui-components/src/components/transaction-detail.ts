@@ -8,11 +8,11 @@ import './copy-button.js'
 import { BaseElement } from '../internal/base-element.js'
 import type { ParsedTransactionInfo } from '@canton-network/core-tx-visualizer'
 import type {
-    ClearSigningResult,
     DescribedField,
     IntentPart,
     OperationDescription,
     TemplateRef,
+    TransactionDescription,
 } from '@canton-network/core-tx-clear-signing'
 import { chevronDownIcon } from '../icons/index.js'
 import {
@@ -77,7 +77,7 @@ class WgTransactionDetail extends BaseElement {
 
     /** The clear-signing description of the transaction's root operations, when available */
     @property({ type: Object })
-    accessor clearSigning: ClearSigningResult | null = null
+    accessor clearSigning: TransactionDescription | null = null
 
     /** Why the transaction could not be described at all, when it could not */
     @property() accessor clearSigningError: string | null = null

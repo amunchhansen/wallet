@@ -13,28 +13,31 @@ import {
     shippedDescriptors,
 } from '@canton-network/core-tx-clear-signing'
 
-// preparedTransaction: base64, as returned by /v2/interactive-submission/prepare.
-// Pass every descriptor this build trusts. clearSign binds each one by package ID, module and entity.
-const { complete, operations } = clearSign(preparedTransaction, [
-    ...shippedDescriptors(),
-    parseDescriptor(descriptorJson),
-])
+// preparedTransaction and preparedTransactionHash: base64, as returned by
+// /v2/interactive-submission/prepare. Pass every descriptor this build trusts. clearSign binds each
+// one by package ID, module and entity.
+const { complete, hash, operations } = await clearSign(
+    preparedTransaction,
+    [...shippedDescriptors(), parseDescriptor(descriptorJson)],
+    preparedTransactionHash
+)
 ```
 
 - `shippedDescriptors` returns the descriptors bundled with this build: the builtin Canton ping and bong templates (`Canton.Internal.Ping:Ping`, `Canton.Internal.Bong:BongProposal`, `Explode`, `Merge`, `Collapse`, `Bong`), and `Splice.ExternalPartyAmuletRules:ExternalPartyAmuletRules` in splice-amulet 0.1.22. That descriptor covers the create, and `TransferFactory_Transfer` and `AllocationFactory_Allocate` through the V1 and V2 token-standard interfaces, one exercise entry per interface. The descriptor list is where a registry or a trust policy would plug in. The wallet gateway's approve page passes the shipped set and the descriptors uploaded on its Descriptors page, which are stored in that browser only and replace a shipped descriptor for the same template.
 - `parseDescriptor` validates descriptor JSON against the schema and then checks the rules a JSON Schema cannot express: an operation declares each path once, every placeholder equals the path of a field of the same operation, and enum references exist. It throws `DescriptorError`. `$schema` must be `https://example.org/canton-clear-signing/v1/schema.json`, the schema's `$id`. That URL is a placeholder until a host is chosen.
-- `clearSign` takes the transaction as base64, so unknown protobuf fields are refused, and returns one `OperationDescription` per root node:
+- `clearSign` takes the transaction as base64, so unknown protobuf fields are refused, and the hash the user is asked to approve. It describes the transaction only if it hashes to that value, and throws `HashMismatchError` otherwise. It returns one `OperationDescription` per root node:
     - `described`: the interpolated intent rendered;
     - `fallback`: a placeholder did not resolve (or was `None`), so `intent` is the descriptor's stable intent;
-    - `undescribed`: no descriptor covers the node, so `intent` is generic (`Create Module:Entity`).
+    - `undescribed`: no descriptor covers the node, so `intent` is generic (`Create Module:Entity`);
+    - `undescribable`: the node cannot be read, and `reason` says why: it is not a create or an exercise, or the contract it exercises occurs twice, is not in the transaction, or is of another template.
 
-    `complete` is true only when every root is described and every field rendered. A wallet should warn the user otherwise. `clearSign` throws on a malformed transaction (a missing root, a contract ID that occurs twice, an exercise on a contract the transaction does not hold, or one of another template). A wallet should show that as an error, not as an incomplete description.
+    `complete` is true only when every root is described and every field rendered. A wallet should warn the user otherwise. `clearSign` throws on a transaction it cannot read at all (no transaction tree, a node without a template ID) and on two descriptors for one template. A wallet should show that as an error, not as an incomplete description.
 
-    `clearSign` describes the bytes it is given; it does not check that they are the bytes that will be signed. Call it on a transaction whose hash has been checked (see the end of this README); the hash check also rejects a transaction with duplicate or unreachable nodes.
+- `describeUnverified` describes a transaction like `clearSign` without checking a hash, and returns no `hash`. Its description is bound to nothing that is signed, so it must not be shown as what a user approves. It is for previewing how descriptors word a transaction, including a hand-built one too incomplete to hash (hashing needs every create and exercise node's seed). The approve page uses it only for a preview opened without a hash.
 
 ## How it works
 
-`clearSign` in [src/clear-sign.ts](src/clear-sign.ts) reads top-down:
+`clearSign` in [src/clear-sign.ts](src/clear-sign.ts) checks the hash, then hands the transaction to `describeUnverified`, which reads top-down:
 
 1. **Decode** the base64 transaction ([src/roots.ts](src/roots.ts)), index the descriptors by binding, and index the contracts the transaction holds: its input contracts and the contracts its create nodes create.
 2. **For each root node**, read the header from the node: kind, template, choice and interface.
@@ -44,7 +47,7 @@ const { complete, operations } = clearSign(preparedTransaction, [
 
 Only root nodes are described. A child node is a consequence of its root's choice, which the root's descriptor words. This is a deliberate narrowing of the design, which traverses nested operations too. Every root is shown, described or not.
 
-The contract an exercise acts on is an input contract, or a contract the transaction creates in an earlier root: a create-and-exercise command creates a contract in one root and exercises it in the next. If the transaction holds no such contract, `clearSign` throws a `TransactionShapeError` and the approve page reports that the transaction cannot be described.
+The contract an exercise acts on is an input contract, or a contract the transaction creates in an earlier root: a create-and-exercise command creates a contract in one root and exercises it in the next. If the transaction holds no such contract, that root is `undescribable` and the other roots are still described.
 
 An input contract read by `@.contract.` paths may have been created under an earlier package of the same package name (an upgrade). Its package name, module and entity must equal the exercise's. This is the one place where the package ID is not matched exactly.
 

@@ -4,7 +4,9 @@
 export {
     HashMismatchError,
     clearSign,
+    describeUnverified,
     type ClearSigningResult,
+    type TransactionDescription,
     type DescribedField,
     type DescriptorInfo,
     type IntentPart,

@@ -3,7 +3,7 @@
 
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import type { ParsedTransactionInfo } from '@canton-network/core-tx-visualizer'
-import type { ClearSigningResult } from '@canton-network/core-tx-clear-signing'
+import type { TransactionDescription } from '@canton-network/core-tx-clear-signing'
 import {
     findAllByShadowRole,
     findAllByShadowText,
@@ -343,9 +343,8 @@ const factoryTemplate = {
     entityName: 'ExternalPartyAmuletRules',
 }
 
-const clearSigning: ClearSigningResult = {
+const clearSigning: TransactionDescription = {
     complete: false,
-    hash: 'preview',
     operations: [
         {
             nodeId: '0',
@@ -420,10 +419,12 @@ const clearSigning: ClearSigningResult = {
 export const ClearSigned: Story = {
     args: { clearSigning },
     play: async ({ canvasElement }) => {
+        // Values in the intent are rendered apart from the wording, and again as the field
+        await expect(
+            await findAllByShadowText(canvasElement, 'ping-1')
+        ).toHaveLength(2)
         for (const text of [
             'What you are signing',
-            // Values in the intent are rendered apart from the wording
-            'ping-1',
             '["alice::1220aa","bob::1220bb"]',
             'None',
             "Cannot display: format 'number' does not accept text",
@@ -455,9 +456,8 @@ export const ClearSignedOperationKinds: Story = {
         ).toHaveLength(2)
         for (const text of [
             'Archive',
-            'AllocationFactory_Allocate',
-            // The interface the choice is exercised through
-            'Splice.Api.Token.AllocationInstructionV2:AllocationFactory',
+            // The choice, then (after a separate "via") the interface it is exercised through
+            /^AllocationFactory_Allocate\s+Splice\.Api\.Token\.AllocationInstructionV2:AllocationFactory$/,
             'Splice.ExternalPartyAmuletRules:ExternalPartyAmuletRules',
             factoryTemplate.packageId,
             // The descriptor's own claim about itself

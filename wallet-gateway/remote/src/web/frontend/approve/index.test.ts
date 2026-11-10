@@ -15,7 +15,11 @@ import {
     makeWallet,
     mockRequest,
 } from '../__tests__/test-helpers.js'
-import { pingCreate, pingCreateHash } from '../__tests__/ping-transaction.js'
+import {
+    pingCreate,
+    pingCreateHash,
+    pingCreateWithoutSeed,
+} from '../__tests__/ping-transaction.js'
 
 // A fetch root decodes and hashes. clearSign rejects it, because a root has to be a create or an
 // exercise. An empty prepared transaction cannot be hashed, which would also disable approval.
@@ -413,6 +417,24 @@ describe('UserUiApprove', () => {
             expect(
                 el.shadowRoot?.querySelector('.alert-warning')?.textContent
             ).toContain('not a transaction to sign')
+        })
+
+        it('describes a preview without a hash, even one that cannot be hashed', async () => {
+            history.replaceState(
+                {},
+                '',
+                `#preview=${encodeURIComponent(pingCreateWithoutSeed)}`
+            )
+            el = await fixture<ApproveUi>(componentFixture)
+            await waitUntil(() => el.clearSigning !== null, 'preview described')
+
+            expect(el.reviewedHash).toBeNull()
+            expect(el.txHash).toBe('')
+            expect(el.clearSigning?.complete).toBe(true)
+            expect(el.clearSigning).not.toHaveProperty('hash')
+            expect(
+                el.shadowRoot?.querySelector('.alert-warning')?.textContent
+            ).toContain('not checked against one')
         })
     })
 

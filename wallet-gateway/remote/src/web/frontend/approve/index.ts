@@ -8,16 +8,16 @@ import {
     handleErrorToast,
     toRelHref,
 } from '@canton-network/core-wallet-ui-components'
-import { HashingSchemeVersion } from '@canton-network/core-ledger-proto'
 import {
     hashForReview,
-    hashPreparedTransaction,
     type ParsedTransactionInfo,
     parsePreparedTransaction,
 } from '@canton-network/core-tx-visualizer'
 import {
     clearSign,
-    type ClearSigningResult,
+    describeUnverified,
+    type Descriptor,
+    type TransactionDescription,
 } from '@canton-network/core-tx-clear-signing'
 import { activeDescriptors } from '../descriptors-store.js'
 import { createUserClient } from '../rpc-client'
@@ -52,7 +52,7 @@ export class ApproveUi extends BaseElement {
     @state() accessor hashMismatch = false
     @state() accessor tx = ''
     @state() accessor txParsed: ParsedTransactionInfo | null = null
-    @state() accessor clearSigning: ClearSigningResult | null = null
+    @state() accessor clearSigning: TransactionDescription | null = null
     @state() accessor clearSigningError: string | null = null
     @state() accessor previewNotice: string | null = null
     @state() accessor status = ''
@@ -354,24 +354,25 @@ export class ApproveUi extends BaseElement {
 
     /** Shows how a prepared transaction would be presented for approval, without loading or signing it. */
     private async showPreview(tx: string, hash: string) {
-        this.previewNotice =
+        const notice =
             'This is a preview, not a transaction to sign. Nothing is submitted.'
         this.commandId = 'preview'
         this.status = 'preview'
         this.disabled = true
         this.tx = tx
-        this.txHash = hash
         if (hash) {
+            this.previewNotice = notice
             await this.reviewHash(hash)
-        } else {
-            // A preview carries no hash to check. The V3 hash only lets the page describe the
-            // bytes; nothing is verified against a hash the user was asked to approve.
-            this.reviewedHash = await hashPreparedTransaction(tx, 'base64', {
-                hashingScheme: HashingSchemeVersion.V3,
-                readUnknownField: 'throw',
-            })
+            await this.describeTransaction()
+            return
         }
-        await this.describeTransaction()
+        // A hand-built transaction may lack what hashing needs, such as node seeds, so a preview
+        // without a hash is described unchecked.
+        this.previewNotice = `${notice} No hash was given, so the description is not checked against one.`
+        this.parseTransaction()
+        await this.describeWith((descriptors) =>
+            describeUnverified(tx, descriptors)
+        )
     }
 
     // The hash the gateway reports only selects the hashing scheme; what is shown and approved is the
@@ -389,24 +390,34 @@ export class ApproveUi extends BaseElement {
     }
 
     private async describeTransaction() {
+        this.parseTransaction()
+        const hash = this.reviewedHash
+        if (!hash) {
+            this.clearSigning = null
+            return
+        }
+        await this.describeWith((descriptors) =>
+            clearSign(this.tx, descriptors, hash)
+        )
+    }
+
+    private parseTransaction() {
         try {
             this.txParsed = parsePreparedTransaction(this.tx)
         } catch (error) {
             console.error('Error parsing prepared transaction:', error)
             this.txParsed = null
         }
+    }
 
-        if (!this.reviewedHash) {
-            this.clearSigning = null
-            return
-        }
+    private async describeWith(
+        describe: (
+            descriptors: Descriptor[]
+        ) => TransactionDescription | Promise<TransactionDescription>
+    ) {
         try {
             const descriptors = activeDescriptors().map((a) => a.descriptor)
-            this.clearSigning = await clearSign(
-                this.tx,
-                descriptors,
-                this.reviewedHash
-            )
+            this.clearSigning = await describe(descriptors)
             this.clearSigningError = null
         } catch (error) {
             // A malformed transaction: the detail view shows why, and approval stays the user's call.

@@ -8,10 +8,15 @@ import {
     type Value,
 } from '@canton-network/core-ledger-proto'
 import { decodePreparedTransaction } from '@canton-network/core-tx-visualizer'
-import { HashMismatchError, clearSign } from './clear-sign.js'
+import {
+    HashMismatchError,
+    clearSign,
+    describeUnverified,
+} from './clear-sign.js'
 import { parseDescriptor } from './descriptor.js'
 import {
     described,
+    hashEither,
     intentText,
     OTHER,
     OWNER,
@@ -373,7 +378,7 @@ describe('clearSign', () => {
         })
     })
 
-    it('fails a None field without cases, and falls back when its placeholder fails', async () => {
+    it('fails a None field that is not optional, and falls back when its placeholder fails', async () => {
         const none: Value = { sum: { oneofKind: 'optional', optional: {} } }
         const argument: Value = {
             sum: {
@@ -397,7 +402,7 @@ describe('clearSign', () => {
         })
     })
 
-    it('fails a field without cases that is not in the record', async () => {
+    it('fails a field that is not optional and not in the record', async () => {
         const [op] = (
             await described(encode(exercisePing('AbortPing')), [ping])
         ).operations
@@ -663,6 +668,25 @@ describe('clearSign', () => {
         await expect(
             clearSign(builtinPingCreate, [ping], 'bm90LWEgaGFzaA==')
         ).rejects.toThrow(HashMismatchError)
+    })
+})
+
+describe('describeUnverified', () => {
+    it('describes a transaction that cannot be hashed', async () => {
+        const tx = exercisePing()
+        tx.transaction!.nodeSeeds = []
+        const unseeded = encode(tx)
+        await expect(hashEither(unseeded)).rejects.toThrow(/has no seed/)
+
+        const result = describeUnverified(unseeded, [ping])
+        expect(result).not.toHaveProperty('hash')
+        expect(result.operations[0]).toMatchObject({
+            kind: 'exercise',
+            status: 'described',
+        })
+        expect(intentText(result.operations[0])).toBe(
+            `Respond to ping ${PING_ID} from ${ALICE}`
+        )
     })
 })
 

@@ -103,12 +103,15 @@ export interface OperationDescription {
     fields: DescribedField[]
 }
 
-export interface ClearSigningResult {
+export interface TransactionDescription {
     /** True when every root is described and every field rendered. */
     complete: boolean
+    operations: OperationDescription[]
+}
+
+export interface ClearSigningResult extends TransactionDescription {
     /** The hash of the described transaction, equal to `expectedHash`. */
     hash: string
-    operations: OperationDescription[]
 }
 
 export class HashMismatchError extends Error {
@@ -156,6 +159,20 @@ export async function clearSign(
     if (hash === undefined) {
         throw new HashMismatchError(expectedHash)
     }
+    return { ...describeUnverified(tx, descriptors), hash }
+}
+
+/**
+ * Describes a prepared transaction like `clearSign`, without checking its hash. The description is
+ * not bound to anything signed, so it must not be shown as what a user approves; it is for previewing
+ * how descriptors word a transaction, including one too incomplete to hash.
+ *
+ * @throws Error when two descriptors bind the same template, or the transaction is malformed
+ */
+export function describeUnverified(
+    tx: string,
+    descriptors: readonly Descriptor[]
+): TransactionDescription {
     const prepared = decode(tx)
     const byTemplate = indexByTemplate(descriptors)
     const contracts = contractsOf(prepared)
@@ -165,7 +182,7 @@ export async function clearSign(
     const complete = operations.every(
         (op) => op.status === 'described' && op.fields.every(resolved)
     )
-    return { complete, hash, operations }
+    return { complete, operations }
 }
 
 function resolved(field: DescribedField): boolean {
