@@ -15,6 +15,7 @@ export {
     type Descriptor,
     type Field,
     type Format,
+    type Exercise,
     type Operation,
 } from './descriptor.js'
 export {

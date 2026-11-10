@@ -8,7 +8,7 @@
         }
     },
     "metadata": {
-        "version": "1.1.0",
+        "version": "1.4.0",
         "publisher": "<splice publisher>",
         "name": "Transfer preapproval"
     },
@@ -34,8 +34,9 @@
                 }
             ]
         },
-        "exercises": {
-            "TransferPreapproval_SendV2": {
+        "exercises": [
+            {
+                "choice": "TransferPreapproval_SendV2",
                 "intent": "Send Amulet to a preapproved receiver",
                 "interpolatedIntent": "Send {amount} Amulet from {sender} to {@.contract.receiver}",
                 "fields": [
@@ -50,24 +51,24 @@
                         "format": "party"
                     },
                     {
+                        "path": "@.contract.receiver",
+                        "label": "To",
+                        "format": "party"
+                    },
+                    {
                         "path": "description",
                         "label": "Description",
-                        "format": "string"
+                        "format": "string",
+                        "cases": {
+                            "None": {
+                                "label": "none"
+                            }
+                        }
                     },
                     {
                         "path": "meta",
                         "label": "Metadata",
                         "cases": {
-                            "Some": {
-                                "label": "given",
-                                "fields": [
-                                    {
-                                        "path": "values[\"splice.lfdecentralizedtrust.org/reason\"]",
-                                        "label": "Memo",
-                                        "format": "string"
-                                    }
-                                ]
-                            },
                             "None": {
                                 "label": "none"
                             }
@@ -85,7 +86,7 @@
                     }
                 ]
             }
-        }
+        ]
     },
     "signatures": []
 }

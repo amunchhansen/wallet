@@ -8,7 +8,7 @@
         }
     },
     "metadata": {
-        "version": "1.0.0",
+        "version": "1.2.0",
         "publisher": "<utility-registry publisher>",
         "name": "Utility registry transfer offer"
     },
@@ -17,26 +17,89 @@
             "intent": "Transfer offer",
             "interpolatedIntent": "Offer of {transfer.amount} {transfer.instrumentId.id} from {transfer.sender} to {transfer.receiver}, to be accepted before {transfer.executeBefore}",
             "fields": [
-                { "path": "transfer.amount", "label": "Amount", "format": "number" },
-                { "path": "transfer.instrumentId.id", "label": "Instrument", "format": "string" },
-                { "path": "transfer.sender", "label": "From", "format": "party" },
-                { "path": "transfer.receiver", "label": "To", "format": "party" },
-                { "path": "transfer.executeBefore", "label": "Accept before", "format": "dateTime" }
+                {
+                    "path": "transfer.amount",
+                    "label": "Amount",
+                    "format": "number"
+                },
+                {
+                    "path": "transfer.instrumentId.id",
+                    "label": "Instrument",
+                    "format": "string"
+                },
+                {
+                    "path": "transfer.sender",
+                    "label": "From",
+                    "format": "party"
+                },
+                {
+                    "path": "transfer.receiver",
+                    "label": "To",
+                    "format": "party"
+                },
+                {
+                    "path": "transfer.executeBefore",
+                    "label": "Accept before",
+                    "format": "dateTime"
+                }
             ]
         },
-        "exercises": {
-            "TransferInstruction_Accept": {
+        "exercises": [
+            {
+                "choice": "TransferInstruction_Accept",
                 "intent": "Accept transfer offer",
                 "interpolatedIntent": "Accept {@.contract.transfer.amount} {@.contract.transfer.instrumentId.id} from {@.contract.transfer.sender} to {@.contract.transfer.receiver}, settled according to the transfer rule at {extraArgs.context.values[\"utility.digitalasset.com/transfer-rule\"].AV_ContractId}",
                 "fields": [
-                    { "path": "extraArgs.context.values[\"utility.digitalasset.com/transfer-rule\"].AV_ContractId", "label": "Transfer rule", "format": "contractId" }
+                    {
+                        "path": "@.contract.transfer.amount",
+                        "label": "Amount",
+                        "format": "number"
+                    },
+                    {
+                        "path": "@.contract.transfer.instrumentId.id",
+                        "label": "Instrument",
+                        "format": "string"
+                    },
+                    {
+                        "path": "@.contract.transfer.sender",
+                        "label": "From",
+                        "format": "party"
+                    },
+                    {
+                        "path": "@.contract.transfer.receiver",
+                        "label": "To",
+                        "format": "party"
+                    },
+                    {
+                        "path": "extraArgs.context.values[\"utility.digitalasset.com/transfer-rule\"].AV_ContractId",
+                        "label": "Transfer rule",
+                        "format": "contractId"
+                    }
                 ]
             },
-            "TransferInstruction_Reject": {
+            {
+                "choice": "TransferInstruction_Reject",
                 "intent": "Reject transfer offer",
-                "interpolatedIntent": "Reject {@.contract.transfer.amount} {@.contract.transfer.instrumentId.id} from {@.contract.transfer.sender}"
+                "interpolatedIntent": "Reject {@.contract.transfer.amount} {@.contract.transfer.instrumentId.id} from {@.contract.transfer.sender}",
+                "fields": [
+                    {
+                        "path": "@.contract.transfer.amount",
+                        "label": "Amount",
+                        "format": "number"
+                    },
+                    {
+                        "path": "@.contract.transfer.instrumentId.id",
+                        "label": "Instrument",
+                        "format": "string"
+                    },
+                    {
+                        "path": "@.contract.transfer.sender",
+                        "label": "From",
+                        "format": "party"
+                    }
+                ]
             }
-        }
+        ]
     },
     "signatures": []
 }

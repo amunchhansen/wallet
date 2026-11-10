@@ -8,7 +8,7 @@
         }
     },
     "metadata": {
-        "version": "1.0.0",
+        "version": "1.3.0",
         "publisher": "<splice publisher>",
         "name": "Featured app right",
         "enums": {
@@ -35,30 +35,55 @@
                     "format": "enum",
                     "params": {
                         "$ref": "$.metadata.enums.appKind"
+                    },
+                    "cases": {
+                        "None": {
+                            "label": "not set"
+                        }
                     }
                 },
                 {
                     "path": "activityWeight",
                     "label": "Activity weight",
-                    "format": "number"
+                    "format": "number",
+                    "cases": {
+                        "None": {
+                            "label": "default"
+                        }
+                    }
                 },
                 {
                     "path": "opsParties",
                     "label": "Operational parties",
-                    "format": "raw"
+                    "cases": {
+                        "None": {
+                            "label": "none"
+                        }
+                    }
                 },
                 {
                     "path": "opsParties.length",
                     "label": "Number of operational parties",
-                    "format": "number"
+                    "format": "number",
+                    "cases": {
+                        "None": {
+                            "label": "none"
+                        }
+                    }
                 }
             ]
         },
-        "exercises": {
-            "FeaturedAppRight_CreateActivityMarker": {
+        "exercises": [
+            {
+                "choice": "FeaturedAppRight_CreateActivityMarker",
                 "intent": "Record featured app activity",
                 "interpolatedIntent": "Record activity of {@.contract.provider} for {beneficiaries.length} beneficiaries",
                 "fields": [
+                    {
+                        "path": "@.contract.provider",
+                        "label": "Provider",
+                        "format": "party"
+                    },
                     {
                         "path": "beneficiaries.length",
                         "label": "Number of beneficiaries",
@@ -72,11 +97,16 @@
                     {
                         "path": "weight",
                         "label": "Weight",
-                        "format": "number"
+                        "format": "number",
+                        "cases": {
+                            "None": {
+                                "label": "not given"
+                            }
+                        }
                     }
                 ]
             }
-        }
+        ]
     },
     "signatures": []
 }

@@ -8,7 +8,7 @@
         }
     },
     "metadata": {
-        "version": "1.2.0",
+        "version": "1.5.0",
         "publisher": "<splice publisher>",
         "name": "DSO rules",
         "enums": {
@@ -19,8 +19,9 @@
         }
     },
     "display": {
-        "exercises": {
-            "DsoRules_RequestVote": {
+        "exercises": [
+            {
+                "choice": "DsoRules_RequestVote",
                 "intent": "Request a DSO vote",
                 "interpolatedIntent": "Request a vote by {requester} on {action}: {reason.body}",
                 "fields": [
@@ -42,12 +43,22 @@
                     {
                         "path": "voteRequestTimeout",
                         "label": "Voting period",
-                        "format": "duration"
+                        "format": "duration",
+                        "cases": {
+                            "None": {
+                                "label": "default"
+                            }
+                        }
                     },
                     {
                         "path": "targetEffectiveAt",
                         "label": "Effective at",
-                        "format": "dateTime"
+                        "format": "dateTime",
+                        "cases": {
+                            "None": {
+                                "label": "not set"
+                            }
+                        }
                     },
                     {
                         "path": "action",
@@ -126,12 +137,22 @@
                                                     {
                                                         "path": "newConfig.voteCooldownTime",
                                                         "label": "New vote cooldown",
-                                                        "format": "duration"
+                                                        "format": "duration",
+                                                        "cases": {
+                                                            "None": {
+                                                                "label": "not set"
+                                                            }
+                                                        }
                                                     },
                                                     {
                                                         "path": "newConfig.svOperationsSwitchOverTimes[\"cip-0104\"]",
                                                         "label": "CIP-0104 switch-over",
-                                                        "format": "dateTime"
+                                                        "format": "dateTime",
+                                                        "cases": {
+                                                            "None": {
+                                                                "label": "not set"
+                                                            }
+                                                        }
                                                     },
                                                     {
                                                         "path": "newConfig.decentralizedSynchronizer.synchronizers",
@@ -215,7 +236,12 @@
                                                                     {
                                                                         "path": "dsoAppActivityWeight",
                                                                         "label": "DSO app activity weight",
-                                                                        "format": "number"
+                                                                        "format": "number",
+                                                                        "cases": {
+                                                                            "None": {
+                                                                                "label": "not set"
+                                                                            }
+                                                                        }
                                                                     }
                                                                 ]
                                                             },
@@ -240,7 +266,8 @@
                     }
                 ]
             },
-            "DsoRules_SetSynchronizerNodeConfig": {
+            {
+                "choice": "DsoRules_SetSynchronizerNodeConfig",
                 "intent": "Update the synchronizer node configuration of an SV",
                 "interpolatedIntent": "Set the node configuration of {sv} on {synchronizerId}",
                 "fields": [
@@ -279,7 +306,12 @@
                                     {
                                         "path": "availableAfter",
                                         "label": "Available after",
-                                        "format": "dateTime"
+                                        "format": "dateTime",
+                                        "cases": {
+                                            "None": {
+                                                "label": "not set"
+                                            }
+                                        }
                                     }
                                 ]
                             },
@@ -332,7 +364,12 @@
                                     {
                                         "path": "availableAfter",
                                         "label": "Available after",
-                                        "format": "dateTime"
+                                        "format": "dateTime",
+                                        "cases": {
+                                            "None": {
+                                                "label": "not set"
+                                            }
+                                        }
                                     }
                                 ]
                             },
@@ -392,7 +429,11 @@
                     {
                         "path": "newNodeConfig.physicalSynchronizers",
                         "label": "Physical synchronizers",
-                        "format": "raw"
+                        "cases": {
+                            "None": {
+                                "label": "not set"
+                            }
+                        }
                     },
                     {
                         "path": "nodeStateCid",
@@ -401,7 +442,7 @@
                     }
                 ]
             }
-        }
+        ]
     },
     "signatures": []
 }

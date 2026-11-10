@@ -8,7 +8,7 @@
         }
     },
     "metadata": {
-        "version": "1.1.0",
+        "version": "2.1.0",
         "publisher": "<splice publisher>",
         "name": "Governance lock transfer"
     },
@@ -137,11 +137,49 @@
                 }
             ]
         },
-        "exercises": {
-            "TransferInstruction_Reject": {
+        "exercises": [
+            {
+                "choice": "TransferInstruction_Reject",
+                "interface": {
+                    "packageId": "55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281",
+                    "moduleName": "Splice.Api.Token.TransferInstructionV1",
+                    "entityName": "TransferInstruction"
+                },
                 "intent": "Reject a governance lock transfer",
                 "interpolatedIntent": "Reject {@.contract.amount} of governance locks from {@.contract.source.owner}",
                 "fields": [
+                    {
+                        "path": "@.contract.amount",
+                        "label": "Amount",
+                        "format": "number"
+                    },
+                    {
+                        "path": "@.contract.source.owner",
+                        "label": "From",
+                        "format": "party"
+                    }
+                ]
+            },
+            {
+                "choice": "TransferInstruction_Reject",
+                "interface": {
+                    "packageId": "29317e3b7b165d2bbf16721bcca0ec4869e53eddb2738bddf790d61af28e0099",
+                    "moduleName": "Splice.Api.Token.TransferInstructionV2",
+                    "entityName": "TransferInstruction"
+                },
+                "intent": "Reject a governance lock transfer",
+                "interpolatedIntent": "Reject {@.contract.amount} of governance locks from {@.contract.source.owner}",
+                "fields": [
+                    {
+                        "path": "@.contract.amount",
+                        "label": "Amount",
+                        "format": "number"
+                    },
+                    {
+                        "path": "@.contract.source.owner",
+                        "label": "From",
+                        "format": "party"
+                    },
                     {
                         "path": "actors",
                         "label": "Actors",
@@ -149,7 +187,7 @@
                     }
                 ]
             }
-        }
+        ]
     },
     "signatures": []
 }

@@ -31,8 +31,14 @@ describe('TransferInstruction_Accept on a utility TransferOffer', () => {
                 entityName: 'TransferInstruction',
             },
             status: 'described',
-            fields: [{ label: 'Transfer rule', value: TRANSFER_RULE }],
         })
+        expect(op?.fields.map((f) => [f.label, f.value])).toEqual([
+            ['Amount', '0.0000000421'],
+            ['Instrument', 'Tebirkes'],
+            ['From', SENDER],
+            ['To', RECEIVER],
+            ['Transfer rule', TRANSFER_RULE],
+        ])
         expect(intentText(op)).toBe(
             `Accept 0.0000000421 Tebirkes from ${SENDER} to ${RECEIVER}, settled according to the transfer rule at ${TRANSFER_RULE}`
         )

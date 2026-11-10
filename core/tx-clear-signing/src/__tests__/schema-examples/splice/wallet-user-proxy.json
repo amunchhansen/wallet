@@ -8,7 +8,7 @@
         }
     },
     "metadata": {
-        "version": "1.0.0",
+        "version": "1.2.0",
         "publisher": "<splice publisher>",
         "name": "Featured app wallet user proxy"
     },
@@ -35,12 +35,17 @@
                 {
                     "path": "optAllowList",
                     "label": "Allowed users",
-                    "format": "raw"
+                    "cases": {
+                        "None": {
+                            "label": "none"
+                        }
+                    }
                 }
             ]
         },
-        "exercises": {
-            "WalletUserProxy_TransferFactory_Transfer": {
+        "exercises": [
+            {
+                "choice": "WalletUserProxy_TransferFactory_Transfer",
                 "intent": "Transfer through a featured app proxy",
                 "interpolatedIntent": "Transfer {proxyArg.choiceArg.transfer.amount} {proxyArg.choiceArg.transfer.instrumentId.id} from {proxyArg.choiceArg.transfer.sender} to {proxyArg.choiceArg.transfer.receiver} via {@.contract.provider}",
                 "fields": [
@@ -78,10 +83,15 @@
                         "path": "proxyArg.featuredAppRightCid",
                         "label": "Featured app right",
                         "format": "contractId"
+                    },
+                    {
+                        "path": "@.contract.provider",
+                        "label": "Provider",
+                        "format": "party"
                     }
                 ]
             }
-        }
+        ]
     },
     "signatures": []
 }

@@ -192,13 +192,16 @@ function toPlain(v: Value | undefined): Plain {
                 toPlain(e.key),
                 toPlain(e.value),
             ])
-        case 'record':
+        case 'record': {
+            const micros = relTimeMicros({ sum })
+            if (micros !== undefined) return formatDuration(micros)
             return Object.fromEntries(
                 sum.record.fields.map((f, i) => [
                     f.label || String(i),
                     toPlain(f.value),
                 ])
             )
+        }
         case 'variant':
             return { [sum.variant.constructor]: toPlain(sum.variant.value) }
         case 'enum':

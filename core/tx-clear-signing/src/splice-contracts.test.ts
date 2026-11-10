@@ -102,8 +102,8 @@ describe('governance locks', () => {
             'Lock type › Vesting ends': '2027-01-08T16:29:55Z',
             Funding: expect.stringMatching(/^003dc46d/),
             Expires: '2026-11-16T16:29:58Z',
-            // A trailing None field is not in the prepared transaction, so it is shown as an inferred None
-            'First proposal': 'None (absent)',
+            // A trailing None field is not in the prepared transaction; its None case is marked as inferred
+            'First proposal': 'none (absent)',
         })
         const lockType = op.fields.find((f) => f.label === 'Lock type')
         expect(lockType?.case).toBe('GLS_VestingLock')
@@ -120,7 +120,7 @@ describe('governance locks', () => {
             'Lock type': 'full lock',
             'Lock type › Lock for': 'super validator',
             'Lock type › Lock for › SV': 'sv-1',
-            Funding: 'None',
+            Funding: 'none',
         })
         expect(shown).not.toHaveProperty(['Lock type › Vesting period'])
     })
@@ -144,7 +144,7 @@ describe('governance locks', () => {
         )
     })
 
-    it('words V1 and V2 accepts the same, from the contract', () => {
+    it('words V1 and V2 accepts the same, each from its own entry', () => {
         const v1 = describeOne(simulated['gl-substitution-accept-v1']())
         const v2 = describeOne(simulated['gl-substitution-accept-v2']())
         const sentence = `Accept the substitution of 250.0000000000 of the vesting lock of ${ALICE}, proposed by ${BOB}`
@@ -157,7 +157,10 @@ describe('governance locks', () => {
         expect(v2.interface?.moduleName).toBe(
             'Splice.Api.Token.TransferInstructionV2'
         )
-        expect(fields(v1).Actors).toBe('None (absent)')
+        expect(v1.descriptor?.name).toBe('Governance lock substitution')
+        expect(v2.descriptor?.name).toBe(v1.descriptor?.name)
+        // Only V2 has actors
+        expect(fields(v1)).not.toHaveProperty('Actors')
         expect(fields(v2).Actors).toBe(JSON.stringify([ALICE]))
     })
 
@@ -180,59 +183,76 @@ describe('governance locks', () => {
 
 describe('governance lock requests through the transfer factory', () => {
     const METADATA = 'Metadata, which the receiver may act on'
-    const REQUEST =
-        "Request a transfer of {amount} Amulet. What the receiver does with it depends on the transfer's metadata"
+    const request = (amount: string) =>
+        `Request a transfer of ${amount} Amulet from ${ALICE} to ${LOCK_MANAGER}. What the receiver does with it depends on the transfer's metadata`
 
     it('words an unlock request as a requested transfer, with the request in the metadata', () => {
         const op = describeOne(simulated['epar-transfer-v1-unlock']())
         expect(op.status).toBe('described')
         // The contract ignores this amount for an unlock; the sentence calls it requested and
         // points to the metadata, which shows the request whole
-        expect(intentText(op)).toBe(REQUEST.replace('{amount}', '1.0000000000'))
-        expect(fields(op)).toMatchObject({
+        expect(op.interface?.moduleName).toBe(
+            'Splice.Api.Token.TransferInstructionV1'
+        )
+        expect(intentText(op)).toBe(request('1.0000000000'))
+        expect(fields(op)).toEqual({
             'Requested amount': '1.0000000000',
+            Instrument: 'Amulet',
             From: ALICE,
             To: LOCK_MANAGER,
             [METADATA]: JSON.stringify({ [REASON_KEY]: UNLOCK_MEMO }),
-            'From account owner': "error: 'owner' applied to party",
+            'Execute before': '2026-11-10T10:00:00Z',
+            'Expected admin': DSO,
         })
     })
 
-    it('words V2 the same; its sender and receiver are accounts', () => {
+    it('words V2 the same, from its own entry; its sender and receiver are accounts', () => {
         const op = describeOne(simulated['epar-transfer-v2-create-lock']())
         expect(op.status).toBe('described')
-        expect(intentText(op)).toBe(
-            REQUEST.replace('{amount}', '10000.0000000000')
+        expect(op.interface?.moduleName).toBe(
+            'Splice.Api.Token.TransferInstructionV2'
         )
+        expect(intentText(op)).toBe(request('10000.0000000000'))
         expect(fields(op)).toMatchObject({
-            From: "error: format 'party' does not accept record",
-            'From account owner': ALICE,
-            'To account owner': LOCK_MANAGER,
+            From: ALICE,
+            To: LOCK_MANAGER,
+            'From account': JSON.stringify({
+                owner: ALICE,
+                provider: null,
+                id: '',
+            }),
             [METADATA]: JSON.stringify({ [REASON_KEY]: CREATE_LOCK_MEMO }),
+            Actors: JSON.stringify([ALICE]),
         })
     })
 })
 
-describe('V1 and V2 AllocationFactory_Allocate share one entry', () => {
+describe('V1 and V2 AllocationFactory_Allocate each have their own entry', () => {
     it('describes V2', () => {
-        const op = describeOne(simulated['epar-allocate-v2']())
+        const tx = simulated['epar-allocate-v2']()
+        const op = describeOne(tx)
         expect(op.status).toBe('described')
+        expect(op.interface?.moduleName).toBe(
+            'Splice.Api.Token.AllocationInstructionV2'
+        )
         expect(fields(op)).toMatchObject({
+            'Amulet administrator': DSO,
             'Number of legs': '2',
-            'Amount (V1)': 'None (absent)',
         })
+        expect(clearSign(tx, spliceDescriptors).complete).toBe(true)
     })
 
-    it('falls back for V1, and shows its own fields', () => {
-        const op = describeOne(simulated['epar-allocate-v1']())
-        expect(op.status).toBe('fallback')
-        expect(intentText(op)).toBe('Allocate funds for a settlement')
-        expect(fields(op)).toMatchObject({
-            Settlement: 'None (absent)',
-            'Settlement (V1)': 'trade-7',
-            'Amount (V1)': '75.0000000000',
-            'Sender (V1)': ALICE,
-        })
+    it('describes V1', () => {
+        const tx = simulated['epar-allocate-v1']()
+        const op = describeOne(tx)
+        expect(op.status).toBe('described')
+        expect(op.interface?.moduleName).toBe(
+            'Splice.Api.Token.AllocationInstructionV1'
+        )
+        expect(intentText(op)).toBe(
+            `Allocate 75.0000000000 Amulet from ${ALICE} to ${BOB} for settlement trade-7, executed by ${PROVIDER}`
+        )
+        expect(clearSign(tx, spliceDescriptors).complete).toBe(true)
     })
 })
 
@@ -246,7 +266,7 @@ describe('DSO governance', () => {
         const action = 'Votes on › Action'
         expect(fields(op)).toMatchObject({
             'Voting period': '3d',
-            'Effective at': 'None (absent)',
+            'Effective at': 'not set (absent)',
             'Votes on': 'the DSO rules',
             [action]: 'change the DSO rules configuration',
             [`${action} › New max text length`]: '2048',
@@ -265,7 +285,7 @@ describe('DSO governance', () => {
         )
         const action = 'Votes on › Action'
         expect(fields(op)).toMatchObject({
-            'Voting period': 'None',
+            'Voting period': 'default',
             'Votes on': 'the amulet rules',
             [action]: 'schedule an amulet configuration',
             [`${action} › Extra traffic price`]: '16.6700000000',
@@ -278,7 +298,7 @@ describe('DSO governance', () => {
             [`${action} › Reward configuration › Minting`]:
                 'Traffic-based app rewards',
             [`${action} › Reward configuration › DSO app activity weight`]:
-                'None (absent)',
+                'not set (absent)',
         })
     })
 
@@ -293,7 +313,7 @@ describe('DSO governance', () => {
             'Legacy sequencer › URL': 'https://legacy-sequencer.example.com',
             'Legacy sequencer › Migration': '2',
             'Sequencer identity': 'set',
-            'Sequencer identity › Available after': 'None (absent)',
+            'Sequencer identity › Available after': 'not set (absent)',
             Mediator: 'set',
             'Mediator › Mediator ID': 'MED::current',
             'Scan › Public URL': 'https://scan.example.com',
@@ -314,7 +334,7 @@ describe('DSO governance', () => {
             'Votes on › Action › New max text length': '2048',
         })
         expect(fields(op).Votes).toMatch(/^\[\["sv-1",\{"sv":/)
-        expect(fields(op).Tracking).toBe('None (absent)')
+        expect(fields(op).Tracking).toBe('none (absent)')
     })
 })
 
@@ -328,7 +348,11 @@ describe('wallet and apps', () => {
         const op = describeCaptured('transfer-offer-accept')
         expect(op.status).toBe('described')
         expect(intentText(op)).toBe(`Accept 12.5000000000 USD from ${ALICE}`)
-        expect(op.fields).toEqual([])
+        expect(fields(op)).toEqual({
+            Amount: '12.5000000000',
+            Unit: 'USD',
+            From: ALICE,
+        })
     })
 
     it('formats an optional enum and counts an optional list', () => {
@@ -346,7 +370,8 @@ describe('wallet and apps', () => {
         expect(intentText(v1)).toBe(
             `Record activity of ${PROVIDER} for 2 beneficiaries`
         )
-        expect(fields(v1).Weight).toBe('None (absent)')
+        // V1 has no weight; V2 added it as an Optional, so V1 reads as its None case
+        expect(fields(v1).Weight).toBe('not given (absent)')
         expect(fields(v2).Weight).toBe('3.0000000000')
     })
 
@@ -406,15 +431,16 @@ describe('wallet and apps', () => {
         )
     })
 
-    it('shows a memo in the Some case of an optional Metadata', () => {
+    it('shows an optional Metadata whole', () => {
         const op = describeOne(simulated['preapproval-send-v2-memo']())
         expect(intentText(op)).toBe(
             `Send 25.0000000000 Amulet from ${ALICE} to ${BOB}`
         )
         expect(fields(op)).toMatchObject({
             Description: 'Rent',
-            Metadata: 'given',
-            'Metadata › Memo': 'Rent for November',
+            Metadata: JSON.stringify({
+                values: { [REASON_KEY]: 'Rent for November' },
+            }),
             'Number of inputs': '2',
         })
     })
@@ -424,8 +450,8 @@ describe('wallet and apps', () => {
         const op = describeOne(tx)
         expect(op.status).toBe('described')
         expect(fields(op)).toMatchObject({
-            Description: 'None (absent)',
             // The None case matches an Optional the ledger left out of the record
+            Description: 'none (absent)',
             Metadata: 'none (absent)',
         })
         // An absent field is not a failure: the transaction is still completely described

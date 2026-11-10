@@ -102,7 +102,35 @@ describe('descriptors store', () => {
 
     it('removes an upload', () => {
         const pong = addDescriptor(otherTemplate('Pong'))
-        removeDescriptor(pong.context.template)
+        removeDescriptor(pong)
         expect(uploadedDescriptors()).toEqual([])
+    })
+
+    it('keeps both interface entries of one descriptor, and replaces the built-in', () => {
+        const iface = (entityName: string) => ({
+            ...builtInPing.context.template,
+            entityName,
+        })
+        addDescriptor({
+            ...builtInPing,
+            metadata: { ...builtInPing.metadata, name: 'Ping with interfaces' },
+            display: {
+                exercises: ['V1', 'V2'].map((name) => ({
+                    choice: 'Respond',
+                    interface: iface(name),
+                    intent: `Respond through ${name}`,
+                })),
+            },
+        })
+
+        const active = activeDescriptors().find(
+            (a) => a.descriptor.context.template.entityName === 'Ping'
+        )
+        expect(active?.source).toBe('replaces built-in')
+        expect(
+            active?.descriptor.display.exercises?.map(
+                (e) => e.interface?.entityName
+            )
+        ).toEqual(['V1', 'V2'])
     })
 })

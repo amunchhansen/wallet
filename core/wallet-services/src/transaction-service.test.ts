@@ -15,7 +15,6 @@ import {
     type SigningDriverInterface,
 } from '@canton-network/core-signing-lib'
 import type { Notifier } from './notification/index.js'
-import { parseDescriptor } from '@canton-network/core-tx-clear-signing'
 import { TransactionService } from './transaction-service.js'
 import { initializeLogRecorder } from './__tests__/test-utils.js'
 import {
@@ -172,22 +171,6 @@ function createStore(
     }
 }
 
-// The hash-vector fixture is not a shipped template. Tests of the signing machinery describe it
-// explicitly. The default descriptor set is what production signs against.
-const hashVectorPlain = parseDescriptor({
-    $schema: 'https://example.org/canton-clear-signing/v1/schema.json',
-    context: {
-        template: {
-            packageId:
-                '7ac0650ef4d386a42bcbc7fe129f41806daa04063ff0970a5a3cdd6f4f829e68',
-            moduleName: 'HashVectors',
-            entityName: 'Plain',
-        },
-    },
-    metadata: { version: '1.0.0', publisher: 'test', name: 'Plain' },
-    display: { create: { intent: 'Create a plain value' } },
-})
-
 function createService(
     store: Store,
     drivers: Partial<Record<SigningProvider, SigningDriverInterface>>,
@@ -197,8 +180,7 @@ function createService(
         store,
         drivers,
         notifier,
-        'HASHING_SCHEME_VERSION_V3',
-        [hashVectorPlain]
+        'HASHING_SCHEME_VERSION_V3'
     )
 }
 
@@ -376,40 +358,7 @@ describe('TransactionService', () => {
                 })
             })
 
-            it('signs a transaction the shipped descriptors do not cover', async () => {
-                const signTransaction = vi.fn().mockResolvedValue({
-                    status: 'signed',
-                    signature: 'undescribed-signature',
-                })
-                const service = new TransactionService(
-                    createStore(),
-                    {
-                        [SigningProvider.WALLET_KERNEL]: createDriver({
-                            signTransaction,
-                        }),
-                    },
-                    notifier,
-                    'HASHING_SCHEME_VERSION_V3'
-                )
-
-                const result = await service.sign(
-                    authContext,
-                    wallet,
-                    signParams
-                )
-
-                expect(signTransaction).toHaveBeenCalledOnce()
-                expect(result).toMatchObject({
-                    status: 'signed',
-                    signature: 'undescribed-signature',
-                })
-                recorder.assertLogged({
-                    level: 'warning',
-                    message: /is not fully described/,
-                })
-            })
-
-            it('signs a transaction the shipped descriptors fully describe', async () => {
+            it('signs the stored transaction with its hash', async () => {
                 const signTransaction = vi.fn().mockResolvedValue({
                     status: 'signed',
                     signature: 'ping-signature',
@@ -446,7 +395,7 @@ describe('TransactionService', () => {
                 })
             })
 
-            it('re-signs at execution when the transaction is not fully described', async () => {
+            it('re-signs at execution once the hash matches', async () => {
                 const signTransaction = vi.fn().mockResolvedValue({
                     status: 'signed',
                     signature: 'undescribed-signature',
@@ -474,10 +423,6 @@ describe('TransactionService', () => {
                 )
 
                 expect(signTransaction).toHaveBeenCalledOnce()
-                recorder.assertLogged({
-                    level: 'warning',
-                    message: /is not fully described/,
-                })
             })
 
             it('refuses to re-sign at execution when the hash does not match', async () => {

@@ -8,7 +8,7 @@
         }
     },
     "metadata": {
-        "version": "1.1.0",
+        "version": "1.3.0",
         "publisher": "<splice publisher>",
         "name": "DSO vote request",
         "enums": {
@@ -120,12 +120,22 @@
                                                 {
                                                     "path": "newConfig.voteCooldownTime",
                                                     "label": "New vote cooldown",
-                                                    "format": "duration"
+                                                    "format": "duration",
+                                                    "cases": {
+                                                        "None": {
+                                                            "label": "not set"
+                                                        }
+                                                    }
                                                 },
                                                 {
                                                     "path": "newConfig.svOperationsSwitchOverTimes[\"cip-0104\"]",
                                                     "label": "CIP-0104 switch-over",
-                                                    "format": "dateTime"
+                                                    "format": "dateTime",
+                                                    "cases": {
+                                                        "None": {
+                                                            "label": "not set"
+                                                        }
+                                                    }
                                                 },
                                                 {
                                                     "path": "newConfig.decentralizedSynchronizer.synchronizers",
@@ -209,7 +219,12 @@
                                                                 {
                                                                     "path": "dsoAppActivityWeight",
                                                                     "label": "DSO app activity weight",
-                                                                    "format": "number"
+                                                                    "format": "number",
+                                                                    "cases": {
+                                                                        "None": {
+                                                                            "label": "not set"
+                                                                        }
+                                                                    }
                                                                 }
                                                             ]
                                                         },
@@ -235,7 +250,12 @@
                 {
                     "path": "trackingCid",
                     "label": "Tracking",
-                    "format": "contractId"
+                    "format": "contractId",
+                    "cases": {
+                        "None": {
+                            "label": "none"
+                        }
+                    }
                 }
             ]
         }

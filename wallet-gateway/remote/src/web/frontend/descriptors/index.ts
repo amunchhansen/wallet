@@ -139,7 +139,7 @@ export class UserUiDescriptors extends BaseElement {
     }
 
     private deleteUpload(d: Descriptor) {
-        removeDescriptor(d.context.template)
+        removeDescriptor(d)
         showToast('', `Removed '${d.metadata.name}'`, 'success')
         this.reload()
     }
@@ -207,7 +207,11 @@ export class UserUiDescriptors extends BaseElement {
     private renderDescriptor({ descriptor, source }: ActiveDescriptor) {
         const { metadata, context, display } = descriptor
         const { packageId, moduleName, entityName } = context.template
-        const choices = Object.keys(display.exercises ?? {})
+        const choices = (display.exercises ?? []).map((entry) =>
+            entry.interface
+                ? `${entry.choice} via ${entry.interface.moduleName}:${entry.interface.entityName}`
+                : entry.choice
+        )
         return html`
             <section class="descriptor">
                 <div class="descriptor-heading">

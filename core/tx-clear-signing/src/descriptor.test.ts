@@ -49,13 +49,13 @@ describe('parseDescriptor', () => {
     it.each([
         'HashVectors:Asset:Poke',
         '7ac0650ef4d386a42bcbc7fe129f41806daa04063ff0970a5a3cdd6f4f829e68:HashVectors:Asset:Poke',
-    ])('rejects an exercise key that is not a choice name: %s', (key) => {
+    ])('rejects a choice that is not a choice name: %s', (choice) => {
         expect(() =>
             parseDescriptor({
                 ...ping,
-                display: { exercises: { [key]: { intent: 'Poke' } } },
+                display: { exercises: [{ choice, intent: 'Poke' }] },
             })
-        ).toThrow('display.exercises')
+        ).toThrow('display.exercises.0.choice')
     })
 
     it.each([
@@ -78,7 +78,7 @@ describe('parseDescriptor', () => {
             "placeholder 'id' has no field with that path",
         ],
         [
-            'a contract read in create',
+            'a contract placeholder in create',
             {
                 create: {
                     intent: 'Ping',
@@ -86,32 +86,31 @@ describe('parseDescriptor', () => {
                     fields: [{ path: 'id' }],
                 },
             },
-            'reads the contract outside an exercise',
+            "placeholder '@.contract.id' has no field with that path",
         ],
         [
-            'a contract field that creates does not declare',
+            'a contract field in create',
             {
-                create: { intent: 'Ping', fields: [{ path: 'id' }] },
-                exercises: {
-                    Respond: {
+                create: {
+                    intent: 'Ping',
+                    fields: [{ path: '@.contract.id' }],
+                },
+            },
+            'display.create.fields.0.path',
+        ],
+        [
+            'a contract placeholder without a field in its exercise',
+            {
+                create: { intent: 'Ping', fields: [{ path: 'owner' }] },
+                exercises: [
+                    {
+                        choice: 'Respond',
                         intent: 'Respond',
                         interpolatedIntent: '{@.contract.owner}',
                     },
-                },
+                ],
             },
-            "has no field 'owner' in create",
-        ],
-        [
-            'a contract field declared in an exercise',
-            {
-                exercises: {
-                    Respond: {
-                        intent: 'Respond',
-                        fields: [{ path: '@.contract.id' }],
-                    },
-                },
-            },
-            'declare it in create',
+            "exercises[0] (Respond): placeholder '@.contract.owner' has no field with that path",
         ],
         [
             'a missing enum',
@@ -211,6 +210,26 @@ describe('parseDescriptor', () => {
         ).not.toThrow()
     })
 
+    it('allows a format on a field with cases', () => {
+        expect(() =>
+            parseDescriptor({
+                ...ping,
+                display: {
+                    create: {
+                        intent: 'Ping',
+                        fields: [
+                            {
+                                path: 'id',
+                                format: 'string',
+                                cases: { None: { label: 'not set' } },
+                            },
+                        ],
+                    },
+                },
+            })
+        ).not.toThrow()
+    })
+
     it('needs a label or fields in a case', () => {
         expect(() =>
             parseDescriptor({
@@ -229,5 +248,43 @@ describe('parseDescriptor', () => {
         expect(() => parseDescriptor({ ...ping, display: {} })).toThrow(
             'display needs create or exercises'
         )
+    })
+
+    it('rejects two entries for the same choice and interface', () => {
+        const iface = { ...ping.context.template, entityName: 'Asset' }
+        expect(() =>
+            parseDescriptor({
+                ...ping,
+                display: {
+                    exercises: [
+                        {
+                            choice: 'Respond',
+                            intent: 'Respond',
+                            interface: iface,
+                        },
+                        {
+                            choice: 'Respond',
+                            intent: 'Respond',
+                            interface: iface,
+                        },
+                    ],
+                },
+            })
+        ).toThrow('the same choice and interface is already described')
+        expect(() =>
+            parseDescriptor({
+                ...ping,
+                display: {
+                    exercises: [
+                        { choice: 'Respond', intent: 'Respond' },
+                        {
+                            choice: 'Respond',
+                            intent: 'Respond through Asset',
+                            interface: iface,
+                        },
+                    ],
+                },
+            })
+        ).not.toThrow()
     })
 })

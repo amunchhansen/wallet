@@ -8,7 +8,7 @@
         }
     },
     "metadata": {
-        "version": "1.0.0",
+        "version": "1.2.0",
         "publisher": "Blockdaemon",
         "name": "Canton ping"
     },
@@ -34,15 +34,39 @@
                 }
             ]
         },
-        "exercises": {
-            "Respond": {
+        "exercises": [
+            {
+                "choice": "Respond",
                 "intent": "Respond to ping",
-                "interpolatedIntent": "Respond to ping {@.contract.id} from {@.contract.initiator}"
+                "interpolatedIntent": "Respond to ping {@.contract.id} from {@.contract.initiator}",
+                "fields": [
+                    {
+                        "path": "@.contract.id",
+                        "label": "Ping ID",
+                        "format": "string"
+                    },
+                    {
+                        "path": "@.contract.initiator",
+                        "label": "Initiator",
+                        "format": "party"
+                    }
+                ]
             },
-            "AbortPing": {
+            {
+                "choice": "AbortPing",
                 "intent": "Abort ping",
                 "interpolatedIntent": "Abort ping {@.contract.id} from {@.contract.initiator}, as {anyone}",
                 "fields": [
+                    {
+                        "path": "@.contract.id",
+                        "label": "Ping ID",
+                        "format": "string"
+                    },
+                    {
+                        "path": "@.contract.initiator",
+                        "label": "Initiator",
+                        "format": "party"
+                    },
                     {
                         "path": "anyone",
                         "label": "Aborted by",
@@ -50,7 +74,7 @@
                     }
                 ]
             }
-        }
+        ]
     },
     "signatures": []
 }

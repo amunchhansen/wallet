@@ -35,9 +35,9 @@ describe('shippedDescriptors', () => {
             moduleName: 'Canton.Internal.Bong',
             entityName: 'BongProposal',
         })
-        expect(Object.keys(descriptor?.display.exercises ?? {}).sort()).toEqual(
-            ['AbortBongProposal', 'Accept']
-        )
+        expect(
+            descriptor?.display.exercises?.map((e) => e.choice).sort()
+        ).toEqual(['AbortBongProposal', 'Accept'])
         expect(descriptor?.display.create?.fields?.map((f) => f.path)).toEqual([
             'id',
             'initiator',
@@ -53,7 +53,7 @@ describe('shippedDescriptors', () => {
         const byEntity = new Map(
             shippedDescriptors().map((d) => [
                 d.context.template.entityName,
-                Object.keys(d.display.exercises ?? {}).sort(),
+                d.display.exercises?.map((e) => e.choice).sort(),
             ])
         )
 
@@ -69,7 +69,7 @@ describe('shippedDescriptors', () => {
         expect(byEntity.get('Bong')).toEqual(['AbortBong', 'Ack'])
     })
 
-    it('describes transfers and allocations on the external party amulet rules', () => {
+    it('describes transfers and allocations on the external party amulet rules, per interface', () => {
         const descriptor = shippedDescriptors().find(
             (d) => d.context.template.entityName === 'ExternalPartyAmuletRules'
         )
@@ -80,9 +80,33 @@ describe('shippedDescriptors', () => {
             moduleName: 'Splice.ExternalPartyAmuletRules',
             entityName: 'ExternalPartyAmuletRules',
         })
-        expect(Object.keys(descriptor?.display.exercises ?? {})).toEqual([
-            'TransferFactory_Transfer',
-            'AllocationFactory_Allocate',
+        expect(descriptor?.display.create?.intent).toBe(
+            'Amulet rules for external parties'
+        )
+        expect(
+            descriptor?.display.exercises?.map((e) => [
+                e.choice,
+                e.interface
+                    ? `${e.interface.moduleName}:${e.interface.entityName}`
+                    : undefined,
+            ])
+        ).toEqual([
+            [
+                'TransferFactory_Transfer',
+                'Splice.Api.Token.TransferInstructionV1:TransferFactory',
+            ],
+            [
+                'TransferFactory_Transfer',
+                'Splice.Api.Token.TransferInstructionV2:TransferFactory',
+            ],
+            [
+                'AllocationFactory_Allocate',
+                'Splice.Api.Token.AllocationInstructionV1:AllocationFactory',
+            ],
+            [
+                'AllocationFactory_Allocate',
+                'Splice.Api.Token.AllocationInstructionV2:AllocationFactory',
+            ],
         ])
     })
 })

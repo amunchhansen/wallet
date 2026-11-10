@@ -5,7 +5,6 @@ import {
     type Descriptor,
     parseDescriptor,
     shippedDescriptors,
-    type TemplateRef,
     templateKey,
 } from '@canton-network/core-tx-clear-signing'
 import { VERSION_PREFIX } from './state-manager.js'
@@ -42,14 +41,14 @@ export function uploadedDescriptors(): Descriptor[] {
  */
 export function addDescriptor(json: unknown): Descriptor {
     const descriptor = parseDescriptor(json)
-    const key = templateKey(descriptor.context.template)
+    const key = keyOf(descriptor)
     const others = readStored().filter((stored) => storedKey(stored) !== key)
     writeStored([...others, json])
     return descriptor
 }
 
-export function removeDescriptor(template: TemplateRef): void {
-    const key = templateKey(template)
+export function removeDescriptor(descriptor: Descriptor): void {
+    const key = keyOf(descriptor)
     writeStored(readStored().filter((stored) => storedKey(stored) !== key))
 }
 
@@ -59,11 +58,9 @@ export function removeDescriptor(template: TemplateRef): void {
  * `clearSign` requires.
  */
 export function activeDescriptors(): ActiveDescriptor[] {
-    const uploads = new Map(
-        uploadedDescriptors().map((d) => [templateKey(d.context.template), d])
-    )
+    const uploads = new Map(uploadedDescriptors().map((d) => [keyOf(d), d]))
     const active: ActiveDescriptor[] = shippedDescriptors().map((builtIn) => {
-        const key = templateKey(builtIn.context.template)
+        const key = keyOf(builtIn)
         const upload = uploads.get(key)
         uploads.delete(key)
         return upload
@@ -91,10 +88,14 @@ function writeStored(entries: unknown[]): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entries))
 }
 
+function keyOf({ context }: Descriptor): string {
+    return templateKey(context.template)
+}
+
 // The template key of a stored entry, or undefined when it no longer parses.
 function storedKey(json: unknown): string | undefined {
     try {
-        return templateKey(parseDescriptor(json).context.template)
+        return keyOf(parseDescriptor(json))
     } catch {
         return undefined
     }

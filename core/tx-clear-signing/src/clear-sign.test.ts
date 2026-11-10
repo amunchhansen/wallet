@@ -37,7 +37,7 @@ const PING_ID = '04d887dd-15b8-4954-8b79-a853811ce7cf'
 const PING_DESCRIPTOR = {
     name: 'Canton ping',
     publisher: '<canton publisher>',
-    version: '1.0.0',
+    version: '1.2.0',
 }
 
 function encode(tx: PreparedTransaction): string {
@@ -227,30 +227,94 @@ describe('clearSign', () => {
         )
     })
 
-    it('describes an interface choice by the template and the choice name', () => {
-        const poke = {
-            intent: 'Poke',
-            interpolatedIntent: 'Poke the asset of {@.contract.owner}',
+    describe('a choice exercised through an interface', () => {
+        const asset = {
+            packageId: VECTOR_PACKAGE,
+            moduleName: 'HashVectors',
+            entityName: 'Asset',
         }
-        const [op] = clearSign(exerciseInterface.preparedTransaction, [
-            vectorDescriptor('Plain', {
-                create: {
-                    intent: 'Plain',
-                    fields: [{ path: 'owner', format: 'party' }],
-                },
-                exercises: { Poke: poke },
-            }),
-        ]).operations
-        expect(op).toMatchObject({
-            choiceId: 'Poke',
-            interface: {
-                packageId: VECTOR_PACKAGE,
-                moduleName: 'HashVectors',
-                entityName: 'Asset',
-            },
-            status: 'described',
+        const poke = (wording: string, iface?: typeof asset) => ({
+            choice: 'Poke',
+            ...(iface && { interface: iface }),
+            intent: 'Poke',
+            interpolatedIntent: `${wording} {@.contract.owner}`,
+            fields: [{ path: '@.contract.owner', format: 'party' }],
         })
-        expect(intentText(op)).toBe(`Poke the asset of ${OWNER}`)
+        const both = vectorDescriptor('Plain', {
+            create: {
+                intent: 'Plain',
+                fields: [{ path: 'owner', format: 'party' }],
+            },
+            exercises: [
+                poke('Poke, by the template, the asset of'),
+                poke('Poke, through Asset, the asset of', asset),
+            ],
+        })
+
+        it('prefers the entry for that interface', () => {
+            const [op] = clearSign(exerciseInterface.preparedTransaction, [
+                both,
+            ]).operations
+            expect(op).toMatchObject({
+                choiceId: 'Poke',
+                interface: asset,
+                status: 'described',
+            })
+            expect(intentText(op)).toBe(
+                `Poke, through Asset, the asset of ${OWNER}`
+            )
+        })
+
+        it('uses the entry with no interface when none names the interface', () => {
+            const plain = vectorDescriptor('Plain', {
+                exercises: [poke('Poke, by the template, the asset of')],
+            })
+            const [op] = clearSign(exerciseInterface.preparedTransaction, [
+                plain,
+            ]).operations
+            expect(intentText(op)).toBe(
+                `Poke, by the template, the asset of ${OWNER}`
+            )
+        })
+
+        it('does not use an entry for another choice', () => {
+            const other = vectorDescriptor('Plain', {
+                exercises: [
+                    { choice: 'Other', intent: 'Other', interface: asset },
+                ],
+            })
+            const [op] = clearSign(exerciseInterface.preparedTransaction, [
+                other,
+            ]).operations
+            expect(op).toMatchObject({ status: 'undescribed' })
+        })
+
+        it('never applies an interface entry to a choice of the template itself', () => {
+            const viaAsset = parseDescriptor({
+                ...pingJson,
+                display: {
+                    exercises: pingJson.display.exercises.map((entry) =>
+                        entry.choice === 'Respond'
+                            ? {
+                                  ...entry,
+                                  interface: {
+                                      ...pingJson.context.template,
+                                      entityName: 'Asset',
+                                  },
+                              }
+                            : entry
+                    ),
+                },
+            })
+            const [op] = clearSign(encode(exercisePing()), [
+                viaAsset,
+            ]).operations
+            // Respond is not exercised through an interface, so the Asset entry does not apply.
+            expect(op).toMatchObject({
+                status: 'undescribed',
+                descriptor: PING_DESCRIPTOR,
+            })
+        })
     })
 
     it('rejects a contract id that occurs twice', () => {
@@ -260,7 +324,9 @@ describe('clearSign', () => {
             throw new Error('fixture has no input contract')
         }
         tx.metadata?.inputContracts.push(input)
-        expect(() => clearSign(encode(tx), [ping])).toThrow(/occurs 2 times/)
+        expect(() => clearSign(encode(tx), [ping])).toThrow(
+            /occurs more than once/
+        )
     })
 
     it('rejects a contract whose template name differs from the exercise', () => {
@@ -287,7 +353,7 @@ describe('clearSign', () => {
         )
     })
 
-    it('shows a None field and falls back when a placeholder is None', () => {
+    it('fails a None field without cases, and falls back when its placeholder fails', () => {
         const none: Value = { sum: { oneofKind: 'optional', optional: {} } }
         const argument: Value = {
             sum: {
@@ -302,7 +368,21 @@ describe('clearSign', () => {
         expect(result.operations[0]).toMatchObject({
             status: 'fallback',
             intent: [{ kind: 'text', text: 'Abort ping' }],
-            fields: [{ path: 'anyone', value: 'None' }],
+            fields: [
+                { path: '@.contract.id', value: PING_ID },
+                { path: '@.contract.initiator', value: ALICE },
+                { path: 'anyone', error: "'anyone' is None" },
+            ],
+        })
+    })
+
+    it('fails a field without cases that is not in the record', () => {
+        const [op] = clearSign(encode(exercisePing('AbortPing')), [
+            ping,
+        ]).operations
+        expect(op?.fields[2]).toMatchObject({
+            path: 'anyone',
+            error: "'anyone' is not in the transaction",
         })
     })
 
@@ -326,28 +406,33 @@ describe('clearSign', () => {
             TransactionShapeError
         )
         expect(() => clearSign(encode(tx), [ping])).toThrow(
-            /is not an input contract/
+            /is neither an input contract nor created by the transaction/
         )
     })
 
-    it('rejects an exercise on a contract created by an earlier root', () => {
+    it('reads a contract that an earlier root creates', () => {
         const plain = vectorDescriptor('Plain', {
             create: {
                 intent: 'Create a plain contract',
                 interpolatedIntent: 'Create a plain contract for {owner}',
                 fields: [{ path: 'owner', format: 'party' }],
             },
-            exercises: {
-                Check: {
+            exercises: [
+                {
+                    choice: 'Check',
                     intent: 'Check',
                     interpolatedIntent:
                         'Check the contract of {@.contract.owner}',
+                    fields: [{ path: '@.contract.owner', format: 'party' }],
                 },
-            },
+            ],
         })
-        expect(() =>
-            clearSign(createAndExercise.preparedTransaction, [plain])
-        ).toThrow(/is not an input contract/)
+        const result = clearSign(createAndExercise.preparedTransaction, [plain])
+        expect(result.complete).toBe(true)
+        expect(result.operations.map(intentText)).toEqual([
+            `Create a plain contract for ${OWNER}`,
+            `Check the contract of ${OWNER}`,
+        ])
     })
 
     it('describes a create and an exercise of an undescribed template without reading the contract', () => {
@@ -370,15 +455,16 @@ describe('clearSign', () => {
 
     it('describes only the root of a nested transaction', () => {
         const driver = vectorDescriptor('Driver', {
-            exercises: {
-                NestedCreates: {
+            exercises: [
+                {
+                    choice: 'NestedCreates',
                     intent: 'Create nested contracts',
                     interpolatedIntent: 'Create contracts {depth} levels deep',
                     fields: [
                         { path: 'depth', label: 'Depth', format: 'number' },
                     ],
                 },
-            },
+            ],
         })
         const result = clearSign(nestedCreates.preparedTransaction, [driver])
         expect(result.operations).toHaveLength(1)
@@ -527,6 +613,17 @@ describe('clearSign', () => {
             'more than one descriptor'
         )
     })
+
+    it('rejects two entries for one choice and interface', () => {
+        expect(() =>
+            vectorDescriptor('Plain', {
+                exercises: [
+                    { choice: 'Poke', intent: 'Poke' },
+                    { choice: 'Poke', intent: 'Poke again' },
+                ],
+            })
+        ).toThrow('the same choice and interface is already described')
+    })
 })
 
 describe('cases', () => {
@@ -599,6 +696,92 @@ describe('cases', () => {
         ])
         // An error in a matched case's field makes the transaction incomplete
         expect(result.complete).toBe(false)
+    })
+
+    it('shows an optional through cases: a Some without a label as its value, and a missing field as None', () => {
+        const result = describeAllKinds(
+            [
+                {
+                    path: 'values.optionalValue',
+                    label: 'Optional',
+                    format: 'number',
+                    cases: { None: { label: 'not set' } },
+                },
+                {
+                    path: 'values.missingValue',
+                    label: 'Missing',
+                    cases: { None: { label: 'not set' } },
+                },
+            ],
+            'Missing is {values.missingValue}'
+        )
+        const [op] = result.operations
+        expect(op?.fields).toEqual([
+            {
+                label: 'Optional',
+                path: 'values.optionalValue',
+                value: '7',
+                case: 'Some',
+                format: 'number',
+            },
+            {
+                label: 'Missing',
+                path: 'values.missingValue',
+                value: 'not set',
+                case: 'None',
+                absent: true,
+            },
+        ])
+        expect(intentText(op)).toBe('Missing is not set')
+        expect(result.complete).toBe(true)
+    })
+
+    it('uses the format for a Some without a label, including in the sentence', () => {
+        const result = describeAllKinds(
+            [
+                {
+                    path: 'values.optionalValue',
+                    format: 'number',
+                    cases: { None: { label: 'not set' } },
+                },
+            ],
+            'It is {values.optionalValue}'
+        )
+        const [op] = result.operations
+        expect(op?.status).toBe('described')
+        expect(intentText(op)).toBe('It is 7')
+    })
+
+    it('fails a Some whose format does not accept the value', () => {
+        const result = describeAllKinds([
+            {
+                path: 'values.optionalValue',
+                format: 'string',
+                cases: { None: { label: 'not set' } },
+            },
+        ])
+        expect(result.operations[0]?.fields[0]?.error).toBe(
+            "format 'string' does not accept int64"
+        )
+        expect(result.complete).toBe(false)
+    })
+
+    it('falls back when a placeholder names an unlabelled None', () => {
+        const result = describeAllKinds(
+            [
+                {
+                    path: 'values.missingValue',
+                    cases: { Some: { label: 'set' } },
+                },
+            ],
+            'Missing is {values.missingValue}'
+        )
+        expect(result.operations[0]?.status).toBe('fallback')
+        expect(result.operations[0]?.fields[0]).toMatchObject({
+            value: 'None',
+            case: 'None',
+            absent: true,
+        })
     })
 
     it('shows the case name when no case matches, and keeps it out of the sentence', () => {

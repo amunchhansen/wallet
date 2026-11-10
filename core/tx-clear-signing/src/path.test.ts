@@ -50,10 +50,22 @@ describe('resolvePath', () => {
         sum: { oneofKind: 'record', record: { fields: [{ label, value }] } },
     })
 
-    it('cannot step into None', () => {
-        expect(() =>
-            resolvePath(record('x', some(none)), parsePath('x.y'))
-        ).toThrow('optional value is None')
+    it('makes the value None when a step is None', () => {
+        expect(resolvePath(record('x', some(none)), parsePath('x.y'))).toEqual({
+            value: none,
+        })
+    })
+
+    it('marks a value reached through a Some at any step as optional', () => {
+        expect(
+            resolvePath(
+                record('x', some(record('y', int(1)))),
+                parsePath('x.y')
+            )
+        ).toEqual({ value: int(1), some: true })
+        expect(
+            resolvePath(record('x', record('y', int(1))), parsePath('x.y'))
+        ).toEqual({ value: int(1) })
     })
 
     it('returns a None that the path names, and unwraps Some', () => {

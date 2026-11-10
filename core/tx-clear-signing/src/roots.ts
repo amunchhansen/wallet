@@ -86,37 +86,49 @@ export function templateKey(t: TemplateRef): string {
 }
 
 /**
- * The create argument of the contract a root exercise acts on. A root exercise can only act on an input
- * contract, since no earlier node of the transaction can have created it. The contract must be of the
- * exercised template's package name, module and entity. Its package ID may differ, because an upgrade
- * keeps the package name and changes the package ID.
+ * The contracts the transaction's exercises can act on, by contract ID: its input contracts, and the
+ * contracts its create nodes create. A root exercise acts on one of these; for example, a
+ * create-and-exercise command creates a contract in one root and exercises it in the next.
  *
- * @throws TransactionShapeError when the contract is not an input contract, occurs more than once, or
- * names another template
+ * @throws TransactionShapeError when a contract ID occurs more than once
+ */
+export function contractsOf(tx: PreparedTransaction): Map<string, Create> {
+    const inputs = (tx.metadata?.inputContracts ?? []).flatMap(({ contract }) =>
+        contract.oneofKind === 'v1' ? [contract.v1] : []
+    )
+    const created = (tx.transaction?.nodes ?? []).flatMap(({ versionedNode }) =>
+        versionedNode.oneofKind === 'v1' &&
+        versionedNode.v1.nodeType.oneofKind === 'create'
+            ? [versionedNode.v1.nodeType.create]
+            : []
+    )
+    const contracts = new Map<string, Create>()
+    for (const create of [...inputs, ...created]) {
+        if (contracts.has(create.contractId)) {
+            throw new TransactionShapeError(
+                `contract '${create.contractId}' occurs more than once`
+            )
+        }
+        contracts.set(create.contractId, create)
+    }
+    return contracts
+}
+
+/**
+ * The create argument of the contract an exercise acts on. The contract must be of the exercised
+ * template's package name, module and entity. Its package ID may differ, because an upgrade keeps the
+ * package name and changes the package ID.
+ *
+ * @throws TransactionShapeError when the transaction has no such contract, or it names another template
  */
 export function contractArgument(
-    tx: PreparedTransaction,
+    contracts: Map<string, Create>,
     exercise: Exercise
 ): Value | undefined {
-    const found: Create[] = []
-    for (const input of tx.metadata?.inputContracts ?? []) {
-        const contract = input.contract
-        if (
-            contract.oneofKind === 'v1' &&
-            contract.v1.contractId === exercise.contractId
-        ) {
-            found.push(contract.v1)
-        }
-    }
-    if (found.length > 1) {
-        throw new TransactionShapeError(
-            `contract '${exercise.contractId}' occurs ${found.length} times`
-        )
-    }
-    const create = found[0]
+    const create = contracts.get(exercise.contractId)
     if (!create) {
         throw new TransactionShapeError(
-            `contract '${exercise.contractId}' is not an input contract`
+            `contract '${exercise.contractId}' is neither an input contract nor created by the transaction`
         )
     }
     const actual = qualifiedName(create.packageName, create.templateId)

@@ -14,7 +14,8 @@ import { shippedDescriptors } from './shipped.js'
 import { intentText } from './__tests__/helpers.js'
 
 const V1_INTERFACE = {
-    packageId: '#splice-api-token-allocation-instruction-v1',
+    packageId:
+        '275064aacfe99cea72ee0c80563936129563776f67415ef9f13e4297eecbc520',
     moduleName: 'Splice.Api.Token.AllocationInstructionV1',
     entityName: 'AllocationFactory',
 }
@@ -34,12 +35,22 @@ const party = (value: string): Value =>
     Value.create({ sum: { oneofKind: 'party', party: value } })
 const timestamp = (micros: string): Value =>
     Value.create({ sum: { oneofKind: 'timestamp', timestamp: micros } })
+const numeric = (value: string): Value =>
+    Value.create({ sum: { oneofKind: 'numeric', numeric: value } })
 const record = (fields: { label: string; value: Value }[]): Value =>
     Value.create({ sum: { oneofKind: 'record', record: { fields } } })
+const noMeta = record([
+    {
+        label: 'values',
+        value: Value.create({
+            sum: { oneofKind: 'textMap', textMap: { entries: [] } },
+        }),
+    },
+])
 
 // V1 AllocationFactory_Allocate takes expectedAdmin and one transferLeg. The same
 // template also implements the V2 choice of the same name, whose argument has
-// transferLegSides. Lookup ignores the interface, so this call still matches.
+// transferLegSides; each is described by the descriptor bound to its interface.
 function v1Allocate(): string {
     const tx = decodePreparedTransaction(allocationV2Multileg)
     const exercise = rootExercise(tx)
@@ -58,10 +69,26 @@ function v1Allocate(): string {
                 {
                     label: 'settlement',
                     value: record([
+                        { label: 'executor', value: party('venue::1') },
+                        {
+                            label: 'settlementRef',
+                            value: record([
+                                { label: 'id', value: text('trade-1') },
+                            ]),
+                        },
+                        {
+                            label: 'requestedAt',
+                            value: timestamp('1700000000000000'),
+                        },
+                        {
+                            label: 'allocateBefore',
+                            value: timestamp('1800000000000000'),
+                        },
                         {
                             label: 'settleBefore',
                             value: timestamp('1900000000000000'),
                         },
+                        { label: 'meta', value: noMeta },
                     ]),
                 },
                 { label: 'transferLegId', value: text('leg-1') },
@@ -69,6 +96,19 @@ function v1Allocate(): string {
                     label: 'transferLeg',
                     value: record([
                         { label: 'sender', value: party('alice::1') },
+                        { label: 'receiver', value: party('bob::1') },
+                        { label: 'amount', value: numeric('5.0000000000') },
+                        {
+                            label: 'instrumentId',
+                            value: record([
+                                {
+                                    label: 'admin',
+                                    value: party('DSO::1220d8a7'),
+                                },
+                                { label: 'id', value: text('Amulet') },
+                            ]),
+                        },
+                        { label: 'meta', value: noMeta },
                     ]),
                 },
             ]),
@@ -144,16 +184,19 @@ describe('AllocationFactory_Allocate', () => {
         ])
     })
 
-    it('falls back for a V1 AllocationFactory_Allocate on the same template', () => {
+    it('describes a V1 AllocationFactory_Allocate on the same template with the V1 entry', () => {
         const result = clearSign(v1Allocate(), shippedDescriptors())
         const op = result.operations[0]
 
-        expect(result.complete).toBe(false)
+        expect(result.complete).toBe(true)
         expect(op).toMatchObject({
             choiceId: 'AllocationFactory_Allocate',
-            status: 'fallback',
-            intent: [{ kind: 'text', text: 'Allocate funds for a settlement' }],
+            status: 'described',
             interface: V1_INTERFACE,
+            descriptor: { name: 'Amulet rules for external parties' },
         })
+        expect(intentText(op)).toBe(
+            'Allocate 5.0000000000 Amulet from alice::1 to bob::1 for settlement trade-1, executed by venue::1'
+        )
     })
 })

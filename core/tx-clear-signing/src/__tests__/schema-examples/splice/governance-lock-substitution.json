@@ -8,7 +8,7 @@
         }
     },
     "metadata": {
-        "version": "1.1.0",
+        "version": "2.2.0",
         "publisher": "<splice publisher>",
         "name": "Governance lock substitution"
     },
@@ -133,7 +133,12 @@
                 {
                     "path": "lockedAmulet",
                     "label": "Funding",
-                    "format": "contractId"
+                    "format": "contractId",
+                    "cases": {
+                        "None": {
+                            "label": "none"
+                        }
+                    }
                 },
                 {
                     "path": "expiresAt",
@@ -143,19 +148,52 @@
                 {
                     "path": "originalSubstitutionCid",
                     "label": "First proposal",
-                    "format": "contractId"
+                    "format": "contractId",
+                    "cases": {
+                        "None": {
+                            "label": "none"
+                        }
+                    }
                 }
             ]
         },
-        "exercises": {
-            "TransferInstruction_Accept": {
+        "exercises": [
+            {
+                "choice": "TransferInstruction_Accept",
+                "interface": {
+                    "packageId": "55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281",
+                    "moduleName": "Splice.Api.Token.TransferInstructionV1",
+                    "entityName": "TransferInstruction"
+                },
                 "intent": "Accept a governance lock substitution",
                 "interpolatedIntent": "Accept the substitution of {@.contract.amount} of the {@.contract.target.specification} of {@.contract.target.owner}, proposed by {@.contract.owner}",
                 "fields": [
                     {
-                        "path": "actors",
-                        "label": "Actors",
-                        "format": "raw"
+                        "path": "@.contract.amount",
+                        "label": "Amount",
+                        "format": "number"
+                    },
+                    {
+                        "path": "@.contract.target.specification",
+                        "label": "Lock type",
+                        "cases": {
+                            "GLS_VestingLock": {
+                                "label": "vesting lock"
+                            },
+                            "GLS_FullLock": {
+                                "label": "full lock"
+                            }
+                        }
+                    },
+                    {
+                        "path": "@.contract.target.owner",
+                        "label": "Lock owner",
+                        "format": "party"
+                    },
+                    {
+                        "path": "@.contract.owner",
+                        "label": "Proposed by",
+                        "format": "party"
                     },
                     {
                         "path": "extraArgs.context.values",
@@ -164,10 +202,97 @@
                     }
                 ]
             },
-            "TransferInstruction_Reject": {
+            {
+                "choice": "TransferInstruction_Reject",
+                "interface": {
+                    "packageId": "55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281",
+                    "moduleName": "Splice.Api.Token.TransferInstructionV1",
+                    "entityName": "TransferInstruction"
+                },
                 "intent": "Reject a governance lock substitution",
                 "interpolatedIntent": "Reject the substitution of {@.contract.amount} proposed by {@.contract.owner}",
                 "fields": [
+                    {
+                        "path": "@.contract.amount",
+                        "label": "Amount",
+                        "format": "number"
+                    },
+                    {
+                        "path": "@.contract.owner",
+                        "label": "Proposed by",
+                        "format": "party"
+                    }
+                ]
+            },
+            {
+                "choice": "TransferInstruction_Accept",
+                "interface": {
+                    "packageId": "29317e3b7b165d2bbf16721bcca0ec4869e53eddb2738bddf790d61af28e0099",
+                    "moduleName": "Splice.Api.Token.TransferInstructionV2",
+                    "entityName": "TransferInstruction"
+                },
+                "intent": "Accept a governance lock substitution",
+                "interpolatedIntent": "Accept the substitution of {@.contract.amount} of the {@.contract.target.specification} of {@.contract.target.owner}, proposed by {@.contract.owner}",
+                "fields": [
+                    {
+                        "path": "@.contract.amount",
+                        "label": "Amount",
+                        "format": "number"
+                    },
+                    {
+                        "path": "@.contract.target.specification",
+                        "label": "Lock type",
+                        "cases": {
+                            "GLS_VestingLock": {
+                                "label": "vesting lock"
+                            },
+                            "GLS_FullLock": {
+                                "label": "full lock"
+                            }
+                        }
+                    },
+                    {
+                        "path": "@.contract.target.owner",
+                        "label": "Lock owner",
+                        "format": "party"
+                    },
+                    {
+                        "path": "@.contract.owner",
+                        "label": "Proposed by",
+                        "format": "party"
+                    },
+                    {
+                        "path": "extraArgs.context.values",
+                        "label": "Context",
+                        "format": "raw"
+                    },
+                    {
+                        "path": "actors",
+                        "label": "Actors",
+                        "format": "raw"
+                    }
+                ]
+            },
+            {
+                "choice": "TransferInstruction_Reject",
+                "interface": {
+                    "packageId": "29317e3b7b165d2bbf16721bcca0ec4869e53eddb2738bddf790d61af28e0099",
+                    "moduleName": "Splice.Api.Token.TransferInstructionV2",
+                    "entityName": "TransferInstruction"
+                },
+                "intent": "Reject a governance lock substitution",
+                "interpolatedIntent": "Reject the substitution of {@.contract.amount} proposed by {@.contract.owner}",
+                "fields": [
+                    {
+                        "path": "@.contract.amount",
+                        "label": "Amount",
+                        "format": "number"
+                    },
+                    {
+                        "path": "@.contract.owner",
+                        "label": "Proposed by",
+                        "format": "party"
+                    },
                     {
                         "path": "actors",
                         "label": "Actors",
@@ -175,7 +300,7 @@
                     }
                 ]
             }
-        }
+        ]
     },
     "signatures": []
 }

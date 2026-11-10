@@ -42,12 +42,6 @@ import {
     type AuthContext,
     AuthTokenProvider,
 } from '@canton-network/core-wallet-auth'
-import {
-    clearSign,
-    shippedDescriptors,
-    type ClearSigningResult,
-    type Descriptor,
-} from '@canton-network/core-tx-clear-signing'
 import { computePreparedTransactionHash } from '@canton-network/core-tx-hashing'
 import { getLogger } from '@logtape/logtape'
 
@@ -86,8 +80,7 @@ export class TransactionService {
         private store: Store,
         private signingDrivers: SigningDrivers = {},
         private notifier: Notifier,
-        private hashingSchemeVersion: HASHING_SCHEME_VERSION,
-        private clearSigningDescriptors: readonly Descriptor[] = shippedDescriptors()
+        private hashingSchemeVersion: HASHING_SCHEME_VERSION
     ) {}
 
     /**
@@ -131,8 +124,6 @@ export class TransactionService {
         if (!driver) {
             throw new Error(`No driver found for ${signingProvider}`)
         }
-
-        this.warnIfNotFullyDescribed(tx)
 
         const baseSignParams = {
             tx: tx.preparedTransaction,
@@ -548,47 +539,6 @@ export class TransactionService {
         })
     }
 
-    /**
-     * The approval page shows an incomplete description and leaves the decision to the user.
-     * Record that this build could not explain the bytes, then sign them anyway.
-     */
-    private warnIfNotFullyDescribed(tx: Transaction): void {
-        let result: ClearSigningResult
-        try {
-            result = clearSign(
-                tx.preparedTransaction,
-                this.clearSigningDescriptors
-            )
-        } catch (err) {
-            const message = err instanceof Error ? err.message : String(err)
-            this.logger.warn(
-                `Prepared transaction '${tx.id}' cannot be described: ${message}`
-            )
-            return
-        }
-        if (result.complete) return
-
-        const reasons = result.operations.flatMap((op) => {
-            const lines: string[] = []
-            if (op.status !== 'described') {
-                lines.push(
-                    `node '${op.nodeId}' is ${op.status} (${op.template.packageId}:${op.template.moduleName}:${op.template.entityName})`
-                )
-            }
-            for (const field of op.fields) {
-                if (field.error !== undefined) {
-                    lines.push(
-                        `node '${op.nodeId}' field '${field.path}': ${field.error}`
-                    )
-                }
-            }
-            return lines
-        })
-        this.logger.warn(
-            `Prepared transaction '${tx.id}' is not fully described: ${reasons.join('; ')}`
-        )
-    }
-
     private async signWithDriver(
         driver: SigningController,
         driverId: SigningProvider,
@@ -740,7 +690,6 @@ export class TransactionService {
             }
 
             await this.assertHashBinding(transaction)
-            this.warnIfNotFullyDescribed(transaction)
 
             const { signature } = await driver
                 .signTransaction({

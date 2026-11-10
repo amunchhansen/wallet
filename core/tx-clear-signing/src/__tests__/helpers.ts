@@ -12,6 +12,7 @@ export const OWNER =
 export const OTHER =
     'hash-vectors-other::122034539ff7a7f4d1754374fd16165642ea6eecb54acef3f7d32f67e188273f8916'
 
+/** A descriptor for a template of the hash-vector fixtures. */
 export function vectorDescriptor(
     entityName: string,
     display: unknown,

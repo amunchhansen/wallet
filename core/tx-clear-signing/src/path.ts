@@ -66,7 +66,10 @@ export interface Resolved {
      * be `None`. A mistyped path looks the same, so the caller shows that the value was inferred.
      */
     absentField?: string
-    /** True when the path names an Optional that holds a value; `value` is that value. */
+    /**
+     * True when the path passed through a `Some`, at any step, so its value is optional; `value` is
+     * the value the `Some` held.
+     */
     some?: true
 }
 
@@ -74,25 +77,30 @@ const NONE: Value = { sum: { oneofKind: 'optional', optional: {} } }
 
 /**
  * Resolves the steps of a path against a Daml value. A name step selects a record field by label or
- * the payload of a variant with that constructor. `Some` is unwrapped. A `None` cannot be stepped
- * into, but is returned when it is the value the path names. A record field that is not in the
- * record resolves the whole path to `None`, with `absentField` set. A final `length` step on a list
- * or text map yields its number of elements as an int64.
+ * the payload of a variant with that constructor. `Some` is unwrapped at every step. A `None` at any
+ * step, or a record field that is not in the record, resolves the whole path to `None`; for a
+ * missing field, `absentField` is set. A final `length` step on a list or text map yields its number
+ * of elements as an int64.
  *
  * @throws PathError when a step does not resolve
  */
 export function resolvePath(root: Value, steps: Step[]): Resolved {
     let current = root
+    let some = false
     for (const [i, step] of steps.entries()) {
         const v = unwrapSome(current)
-        const missing = step.kind === 'name' && lacksField(v, step.name)
-        if (missing) {
+        if (isNone(v)) {
+            return { value: NONE }
+        }
+        if (step.kind === 'name' && lacksField(v, step.name)) {
             return { value: NONE, absentField: step.name }
         }
+        some ||= v !== current
         current = applyStep(v, step, i === steps.length - 1)
     }
     const value = unwrapSome(current)
-    return value === current ? { value } : { value, some: true }
+    some ||= value !== current
+    return some ? { value, some: true } : { value }
 }
 
 function lacksField(v: Value, name: string): boolean {
@@ -107,9 +115,6 @@ export function isNone(v: Value): boolean {
 }
 
 function applyStep(v: Value, step: Step, isLast: boolean): Value {
-    if (isNone(v)) {
-        throw new PathError('optional value is None')
-    }
     const sum = v.sum
     switch (step.kind) {
         case 'key': {

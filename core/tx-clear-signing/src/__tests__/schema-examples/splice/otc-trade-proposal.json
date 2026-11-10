@@ -8,7 +8,7 @@
         }
     },
     "metadata": {
-        "version": "1.0.0",
+        "version": "1.2.0",
         "publisher": "<splice publisher>",
         "name": "OTC trade proposal"
     },
@@ -64,11 +64,22 @@
                 }
             ]
         },
-        "exercises": {
-            "OTCTradeProposal_Accept": {
+        "exercises": [
+            {
+                "choice": "OTCTradeProposal_Accept",
                 "intent": "Approve an OTC trade",
                 "interpolatedIntent": "Approve, as {approver}, a trade of {@.contract.transferLegs.length} legs at {@.contract.venue}",
                 "fields": [
+                    {
+                        "path": "@.contract.transferLegs.length",
+                        "label": "Number of legs",
+                        "format": "number"
+                    },
+                    {
+                        "path": "@.contract.venue",
+                        "label": "Venue",
+                        "format": "party"
+                    },
                     {
                         "path": "approver",
                         "label": "Approver",
@@ -76,7 +87,7 @@
                     }
                 ]
             }
-        }
+        ]
     },
     "signatures": []
 }

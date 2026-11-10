@@ -8,7 +8,7 @@
         }
     },
     "metadata": {
-        "version": "1.1.0",
+        "version": "1.3.0",
         "publisher": "Blockdaemon",
         "name": "Canton bong merge (canton-builtin-admin-workflow-ping)"
     },
@@ -49,11 +49,22 @@
                 }
             ]
         },
-        "exercises": {
-            "ProcessMerge": {
+        "exercises": [
+            {
+                "choice": "ProcessMerge",
                 "intent": "Process merge",
                 "interpolatedIntent": "Process merge {@.contract.id} path {@.contract.path} as {winner}, collapsing {leftId} and {rightId}",
                 "fields": [
+                    {
+                        "path": "@.contract.id",
+                        "label": "Bong ID",
+                        "format": "string"
+                    },
+                    {
+                        "path": "@.contract.path",
+                        "label": "Path",
+                        "format": "string"
+                    },
                     {
                         "path": "winner",
                         "label": "Winner",
@@ -71,10 +82,16 @@
                     }
                 ]
             },
-            "AbortMerge": {
+            {
+                "choice": "AbortMerge",
                 "intent": "Abort merge",
                 "interpolatedIntent": "Abort merge {@.contract.id} as {anyone}",
                 "fields": [
+                    {
+                        "path": "@.contract.id",
+                        "label": "Bong ID",
+                        "format": "string"
+                    },
                     {
                         "path": "anyone",
                         "label": "Aborted by",
@@ -82,7 +99,7 @@
                     }
                 ]
             }
-        }
+        ]
     },
     "signatures": []
 }

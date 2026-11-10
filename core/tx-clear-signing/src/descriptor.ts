@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { z } from 'zod'
-import { CONTRACT_PREFIX, parseIntent } from './intent.js'
+import { parseIntent } from './intent.js'
+import { templateKey } from './roots.js'
 
 // The patterns are those of canton-clear-signing-v1.schema.json. The conformance test runs the
 // schema's own valid and invalid examples through this parser.
@@ -19,8 +20,9 @@ const identifier = new RegExp(`^${NAME}$`)
 // Daml constructors start with an uppercase letter, as do the Optional cases Some and None
 const caseName = /^[A-Z][A-Za-z0-9_]*$/
 const dottedName = new RegExp(`^${NAME}(?:\\.${NAME})*$`)
+/** A path of an exercise field, which may read the exercised contract. */
 const pathPattern = new RegExp(`^(?:${STEPS}|@\\.contract\\.${STEPS})$`)
-/** A path inside a case: it starts at the matched value, so it cannot read the contract. */
+/** A path of a create field or a case field: there is no contract to read. */
 const relativePathPattern = new RegExp(`^${STEPS}$`)
 const enumRef = new RegExp(`^\\$\\.metadata\\.enums\\.${NAME}$`)
 const semver =
@@ -74,9 +76,6 @@ function fieldSchema(path: RegExp) {
             message:
                 "params are required with format 'enum' and forbidden otherwise",
         })
-        .refine((f) => f.cases === undefined || f.format === undefined, {
-            message: 'a field with cases has no format',
-        })
 }
 
 const FieldSchema: z.ZodType<Field> = z.lazy(() => fieldSchema(pathPattern))
@@ -99,10 +98,26 @@ const CasesSchema = z
         message: 'cases needs at least one entry',
     })
 
-const OperationSchema = z.strictObject({
-    intent: z.string().regex(stableIntent),
-    interpolatedIntent: z.string().optional(),
-    fields: z.array(FieldSchema).optional(),
+function operationSchema(field: z.ZodType<Field>) {
+    return z.strictObject({
+        intent: z.string().regex(stableIntent),
+        interpolatedIntent: z.string().optional(),
+        fields: z.array(field).optional(),
+    })
+}
+
+const CreateSchema = operationSchema(CaseFieldSchema)
+
+const TemplateIdSchema = z.strictObject({
+    packageId: z.string().regex(/^[0-9a-f]{64}$/),
+    moduleName: z.string().regex(dottedName),
+    entityName: z.string().regex(identifier),
+})
+
+/** One choice of the template, optionally only when exercised through one interface. */
+const ExerciseSchema = operationSchema(FieldSchema).extend({
+    choice: z.string().regex(identifier),
+    interface: TemplateIdSchema.optional(),
 })
 
 const EnumTableSchema = z
@@ -120,11 +135,7 @@ const DescriptorSchema = z.strictObject({
     }),
     $comment: z.string().optional(),
     context: z.strictObject({
-        template: z.strictObject({
-            packageId: z.string().regex(/^[0-9a-f]{64}$/),
-            moduleName: z.string().regex(dottedName),
-            entityName: z.string().regex(identifier),
-        }),
+        template: TemplateIdSchema,
     }),
     metadata: z.strictObject({
         version: z.string().regex(semver),
@@ -137,13 +148,8 @@ const DescriptorSchema = z.strictObject({
     }),
     display: z
         .strictObject({
-            create: OperationSchema.optional(),
-            exercises: z
-                .record(z.string().regex(identifier), OperationSchema)
-                .refine((e) => Object.keys(e).length > 0, {
-                    message: 'exercises needs at least one entry',
-                })
-                .optional(),
+            create: CreateSchema.optional(),
+            exercises: z.array(ExerciseSchema).min(1).optional(),
         })
         .refine((d) => d.create !== undefined || d.exercises !== undefined, {
             message: 'display needs create or exercises',
@@ -152,7 +158,9 @@ const DescriptorSchema = z.strictObject({
 })
 
 export type Descriptor = z.infer<typeof DescriptorSchema>
-export type Operation = z.infer<typeof OperationSchema>
+export type Operation = z.infer<typeof CreateSchema>
+/** An exercise entry: an operation for one choice, and the interface it is exercised through. */
+export type Exercise = z.infer<typeof ExerciseSchema>
 export type Format = (typeof FORMATS)[number]
 
 export class DescriptorError extends Error {
@@ -164,9 +172,9 @@ export class DescriptorError extends Error {
 
 /**
  * Validates descriptor JSON against the v1 schema, and then against the rules a JSON Schema cannot
- * express: an operation declares each path once, every placeholder equals the path of a declared
- * field, contract fields are declared once in `create` and read as `{@.contract.<path>}` from an
- * exercise, and every enum reference names a table.
+ * express: an operation declares each path once, every placeholder equals the path of a field of the
+ * same operation, every enum reference names a table, and no two exercise entries name the same
+ * choice and interface.
  *
  * @throws DescriptorError listing every problem found
  */
@@ -190,56 +198,51 @@ export function parseDescriptor(json: unknown): Descriptor {
 function crossReferenceProblems(d: Descriptor): string[] {
     const create = d.display.create
     const problems = create ? operationProblems(d, 'create', create) : []
-    const contractPaths = create ? fieldPaths(create) : []
-    for (const [choice, op] of Object.entries(d.display.exercises ?? {})) {
+    const seen = new Set<string>()
+    for (const [i, exercise] of (d.display.exercises ?? []).entries()) {
+        const key = exerciseKey(exercise)
+        if (seen.has(key)) {
+            problems.push(
+                `exercises[${i}] (${exercise.choice}): the same choice and interface is already described`
+            )
+        }
+        seen.add(key)
         problems.push(
-            ...operationProblems(d, `exercises.${choice}`, op, contractPaths)
+            ...operationProblems(
+                d,
+                `exercises[${i}] (${exercise.choice})`,
+                exercise
+            )
         )
     }
     return problems
 }
 
-// contractPaths is the create field paths for an exercise, and absent for create, where @.contract
-// does not exist.
+// An entry without an interface is keyed by its choice alone, so it cannot be repeated either.
+function exerciseKey(exercise: Exercise): string {
+    const iface = exercise.interface
+    return iface
+        ? `${exercise.choice} via ${templateKey(iface)}`
+        : exercise.choice
+}
+
 function operationProblems(
     d: Descriptor,
     where: string,
-    op: Operation,
-    contractPaths?: string[]
+    op: Operation
 ): string[] {
-    const problems: string[] = []
-    const ownPaths = fieldPaths(op)
-    for (const f of op.fields ?? []) {
-        if (f.path.startsWith(CONTRACT_PREFIX)) {
-            problems.push(
-                `${where}: field '${f.path}' reads the contract; declare it in create`
-            )
-        }
-    }
-    problems.push(...fieldProblems(d, where, op.fields ?? []))
-
+    const problems = fieldProblems(d, where, op.fields ?? [])
     let segments
     try {
         segments = parseIntent(op.interpolatedIntent ?? '')
     } catch (err) {
         return [...problems, `${where}: ${(err as Error).message}`]
     }
+    const paths = fieldPaths(op)
     for (const segment of segments) {
-        if (segment.kind !== 'placeholder') continue
-        const p = segment.path
-        if (!p.startsWith(CONTRACT_PREFIX)) {
-            if (!ownPaths.includes(p)) {
-                problems.push(
-                    `${where}: placeholder '${p}' has no field with that path`
-                )
-            }
-        } else if (contractPaths === undefined) {
+        if (segment.kind === 'placeholder' && !paths.includes(segment.path)) {
             problems.push(
-                `${where}: placeholder '${p}' reads the contract outside an exercise`
-            )
-        } else if (!contractPaths.includes(p.slice(CONTRACT_PREFIX.length))) {
-            problems.push(
-                `${where}: placeholder '${p}' has no field '${p.slice(CONTRACT_PREFIX.length)}' in create`
+                `${where}: placeholder '${segment.path}' has no field with that path`
             )
         }
     }

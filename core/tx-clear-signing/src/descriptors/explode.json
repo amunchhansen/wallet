@@ -8,7 +8,7 @@
         }
     },
     "metadata": {
-        "version": "1.1.0",
+        "version": "1.3.0",
         "publisher": "Blockdaemon",
         "name": "Canton bong explode (canton-builtin-admin-workflow-ping)"
     },
@@ -54,11 +54,22 @@
                 }
             ]
         },
-        "exercises": {
-            "ProcessExplode": {
+        "exercises": [
+            {
+                "choice": "ProcessExplode",
                 "intent": "Process explode",
                 "interpolatedIntent": "Process explode {@.contract.id} path {@.contract.path} as {winner}",
                 "fields": [
+                    {
+                        "path": "@.contract.id",
+                        "label": "Bong ID",
+                        "format": "string"
+                    },
+                    {
+                        "path": "@.contract.path",
+                        "label": "Path",
+                        "format": "string"
+                    },
                     {
                         "path": "winner",
                         "label": "Winner",
@@ -66,10 +77,16 @@
                     }
                 ]
             },
-            "AbortExplode": {
+            {
+                "choice": "AbortExplode",
                 "intent": "Abort explode",
                 "interpolatedIntent": "Abort explode {@.contract.id} as {anyone}",
                 "fields": [
+                    {
+                        "path": "@.contract.id",
+                        "label": "Bong ID",
+                        "format": "string"
+                    },
                     {
                         "path": "anyone",
                         "label": "Aborted by",
@@ -77,7 +94,7 @@
                     }
                 ]
             }
-        }
+        ]
     },
     "signatures": []
 }

@@ -8,7 +8,7 @@
         }
     },
     "metadata": {
-        "version": "1.0.0",
+        "version": "1.2.0",
         "publisher": "<splice publisher>",
         "name": "Wallet transfer offer",
         "enums": {
@@ -64,12 +64,33 @@
                 }
             ]
         },
-        "exercises": {
-            "TransferOffer_Accept": {
+        "exercises": [
+            {
+                "choice": "TransferOffer_Accept",
                 "intent": "Accept a transfer offer",
-                "interpolatedIntent": "Accept {@.contract.amount.amount} {@.contract.amount.unit} from {@.contract.sender}"
+                "interpolatedIntent": "Accept {@.contract.amount.amount} {@.contract.amount.unit} from {@.contract.sender}",
+                "fields": [
+                    {
+                        "path": "@.contract.amount.amount",
+                        "label": "Amount",
+                        "format": "number"
+                    },
+                    {
+                        "path": "@.contract.amount.unit",
+                        "label": "Unit",
+                        "format": "enum",
+                        "params": {
+                            "$ref": "$.metadata.enums.unit"
+                        }
+                    },
+                    {
+                        "path": "@.contract.sender",
+                        "label": "From",
+                        "format": "party"
+                    }
+                ]
             }
-        }
+        ]
     },
     "signatures": []
 }
