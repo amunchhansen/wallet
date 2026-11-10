@@ -81,7 +81,8 @@ function formatEnum(v: Value, field: Field, enums: EnumTables): string {
     return label
 }
 
-function enumKey(v: Value): string {
+/** The table key of an enum, a bool, or a variant with no payload. */
+export function enumKey(v: Value): string {
     const sum = v.sum
     switch (sum.oneofKind) {
         case 'enum':
@@ -117,10 +118,16 @@ function formatDate(days: number): string {
     return new Date(days * MS_PER_DAY).toISOString().slice(0, 10)
 }
 
-// DA.Time's RelTime is a record with one int64 field, microseconds.
+// DA.Time's RelTime, identified by the type the prepared transaction carries.
 function relTimeMicros(v: Value): bigint | undefined {
     if (v.sum.oneofKind !== 'record') return undefined
-    const fields = v.sum.record.fields
+    const { recordId, fields } = v.sum.record
+    if (
+        recordId?.moduleName !== 'DA.Time.Types' ||
+        recordId.entityName !== 'RelTime'
+    ) {
+        return undefined
+    }
     const only = fields.length === 1 ? fields[0] : undefined
     const value = only?.label === 'microseconds' ? only.value?.sum : undefined
     return value?.oneofKind === 'int64' ? BigInt(value.int64) : undefined
@@ -213,8 +220,9 @@ function toPlain(v: Value | undefined): Plain {
 
 // Values come from the transaction and are untrusted. Control, format (bidirectional overrides,
 // zero-width characters) and line or paragraph separator characters could break lines, hide text or
-// reorder the text around them, so they are shown escaped.
-const UNSAFE = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu
+// reorder the text around them, so they are shown escaped. Descriptor text rejects the same set.
+export const UNSAFE_CLASS = String.raw`\p{Cc}\p{Cf}\p{Zl}\p{Zp}`
+const UNSAFE = new RegExp(`[${UNSAFE_CLASS}]`, 'gu')
 
 function sanitize(s: string): string {
     return s.replace(

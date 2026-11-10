@@ -1,7 +1,13 @@
 // Copyright (c) 2025-2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { OperationDescription } from '../clear-sign.js'
+import { HashingSchemeVersion } from '@canton-network/core-ledger-proto'
+import { hashPreparedTransaction } from '@canton-network/core-tx-visualizer'
+import {
+    clearSign,
+    type ClearSigningResult,
+    type OperationDescription,
+} from '../clear-sign.js'
 import { type Descriptor, parseDescriptor } from '../descriptor.js'
 
 /** Package of the templates in the core-tx-hashing vectors copied to fixtures/. */
@@ -35,6 +41,31 @@ export function vectorDescriptor(
         },
         display,
     })
+}
+
+/** A hash of the transaction under the first scheme that can hash it, V3 then V2. */
+export async function hashEither(tx: string): Promise<string> {
+    let last: unknown
+    const schemes = [HashingSchemeVersion.V3, HashingSchemeVersion.V2] as const
+    for (const hashingScheme of schemes) {
+        try {
+            return await hashPreparedTransaction(tx, 'base64', {
+                hashingScheme,
+                readUnknownField: 'throw',
+            })
+        } catch (err) {
+            last = err
+        }
+    }
+    throw last
+}
+
+/** Describes a transaction after hashing it, as the approve page does. */
+export async function described(
+    tx: string,
+    descriptors: readonly Descriptor[]
+): Promise<ClearSigningResult> {
+    return clearSign(tx, descriptors, await hashEither(tx))
 }
 
 /** The intent as one string, for assertions on its wording. */

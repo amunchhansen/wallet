@@ -8,7 +8,7 @@
         }
     },
     "metadata": {
-        "version": "1.5.0",
+        "version": "1.6.0",
         "publisher": "<splice publisher>",
         "name": "Transfer preapproval"
     },
@@ -59,17 +59,13 @@
                         "path": "description",
                         "label": "Description",
                         "format": "string",
-                        "cases": {
-                            "None": {}
-                        }
+                        "optional": true
                     },
                     {
                         "path": "meta",
                         "label": "Metadata",
                         "format": "raw",
-                        "cases": {
-                            "None": {}
-                        }
+                        "optional": true
                     },
                     {
                         "path": "inputs.length",

@@ -11,7 +11,14 @@ const int64 = (n: string): Value => ({ sum: { oneofKind: 'int64', int64: n } })
 const relTime = (micros: string): Value => ({
     sum: {
         oneofKind: 'record',
-        record: { fields: [{ label: 'microseconds', value: int64(micros) }] },
+        record: {
+            recordId: {
+                packageId: '0'.repeat(64),
+                moduleName: 'DA.Time.Types',
+                entityName: 'RelTime',
+            },
+            fields: [{ label: 'microseconds', value: int64(micros) }],
+        },
     },
 })
 const field = (format: Field['format'], ref?: string): Field => ({
@@ -32,6 +39,25 @@ describe('formatValue', () => {
     ])('formats a duration of %s µs as %s', (micros, expected) => {
         expect(formatValue(relTime(micros), field('duration'), {})).toBe(
             expected
+        )
+    })
+
+    it('does not treat a record of the same shape as a duration', () => {
+        const bare = {
+            sum: {
+                oneofKind: 'record' as const,
+                record: {
+                    fields: [
+                        { label: 'microseconds', value: int64('1000000') },
+                    ],
+                },
+            },
+        }
+        expect(formatValue(bare, field('raw'), {})).toBe(
+            '{"microseconds":"1000000"}'
+        )
+        expect(() => formatValue(bare, field('duration'), {})).toThrow(
+            "format 'duration' does not accept record"
         )
     })
 

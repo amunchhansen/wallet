@@ -360,9 +360,6 @@ describe('UserUiApprove', () => {
         })
 
         it('shows why a transaction cannot be described', async () => {
-            const consoleError = vi
-                .spyOn(console, 'error')
-                .mockImplementation(() => {})
             mockApproveState(
                 makeTransaction({
                     preparedTransaction: fetchRoot,
@@ -371,28 +368,26 @@ describe('UserUiApprove', () => {
             )
             el = await fixture<ApproveUi>(componentFixture)
             await waitUntil(
-                () => el.reviewedHash === fetchRootHash,
-                'hash reviewed'
+                () => el.clearSigning !== null,
+                'transaction described'
             )
 
-            expect(el.clearSigning).toBeNull()
-            expect(el.clearSigningError).toEqual(expect.any(String))
+            expect(el.clearSigning?.complete).toBe(false)
+            expect(el.clearSigning?.operations[0]).toMatchObject({
+                kind: 'other',
+                status: 'undescribable',
+            })
             const detail = el.shadowRoot?.querySelector(
                 'wg-transaction-detail'
             ) as HTMLElement | null
             await (detail as { updateComplete?: Promise<unknown> } | null)
                 ?.updateComplete
             expect(
-                detail?.shadowRoot?.querySelector('.alert-danger')?.textContent
-            ).toContain('This transaction could not be described')
+                detail?.shadowRoot?.querySelector('.alert-warning')?.textContent
+            ).toContain('not described')
             const approve =
                 detail?.shadowRoot?.querySelector('button.btn-primary')
             expect(approve).toHaveProperty('disabled', false)
-            expect(consoleError).toHaveBeenCalledWith(
-                'Error describing prepared transaction:',
-                expect.anything()
-            )
-            consoleError.mockRestore()
         })
     })
 

@@ -8,7 +8,7 @@
         }
     },
     "metadata": {
-        "version": "1.5.0",
+        "version": "1.6.0",
         "publisher": "<splice publisher>",
         "name": "DSO vote request"
     },
@@ -46,9 +46,7 @@
                     "path": "trackingCid",
                     "label": "Tracking",
                     "format": "contractId",
-                    "cases": {
-                        "None": {}
-                    }
+                    "optional": true
                 }
             ]
         }

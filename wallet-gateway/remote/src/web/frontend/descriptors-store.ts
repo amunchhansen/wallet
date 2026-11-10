@@ -9,9 +9,9 @@ import {
 } from '@canton-network/core-tx-clear-signing'
 import { VERSION_PREFIX } from './state-manager.js'
 
-// Uploaded descriptors are kept in this browser only. They are unverified, and are used only to
-// describe transactions on the approve page here; the gateway's own check uses the built-in set.
-// The key must carry the app's prefix, or StateManager deletes it when a page loads.
+// Uploaded descriptors are unverified and stay in this browser. They only change how the approve
+// page here describes a transaction. The key must carry the app's prefix, or StateManager deletes
+// it when a page loads.
 const STORAGE_KEY = `${VERSION_PREFIX}.clear-signing-descriptors`
 
 export type DescriptorSource = 'built-in' | 'uploaded' | 'replaces built-in'

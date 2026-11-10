@@ -8,7 +8,7 @@
         }
     },
     "metadata": {
-        "version": "1.4.0",
+        "version": "1.5.0",
         "publisher": "<utility-registry publisher>",
         "name": "Utility registry transfer offer"
     },
@@ -52,7 +52,7 @@
                     "entityName": "TransferInstruction"
                 },
                 "intent": "Accept transfer offer",
-                "interpolatedIntent": "Accept {@.contract.transfer.amount} {@.contract.transfer.instrumentId.id} from {@.contract.transfer.sender} to {@.contract.transfer.receiver}, settled according to the transfer rule {extraArgs.context.values[\"utility.digitalasset.com/transfer-rule\"]}",
+                "interpolatedIntent": "Accept {@.contract.transfer.amount} {@.contract.transfer.instrumentId.id} from {@.contract.transfer.sender} to {@.contract.transfer.receiver}, settled according to the transfer rule at {extraArgs.context.values[\"utility.digitalasset.com/transfer-rule\"].AV_ContractId}",
                 "fields": [
                     {
                         "path": "@.contract.transfer.amount",
@@ -75,9 +75,9 @@
                         "format": "party"
                     },
                     {
-                        "path": "extraArgs.context.values[\"utility.digitalasset.com/transfer-rule\"]",
+                        "path": "extraArgs.context.values[\"utility.digitalasset.com/transfer-rule\"].AV_ContractId",
                         "label": "Transfer rule",
-                        "format": "raw"
+                        "format": "contractId"
                     }
                 ]
             },

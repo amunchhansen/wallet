@@ -9,8 +9,8 @@
 import { describe, expect, it } from 'vitest'
 import { HashingSchemeVersion } from '@canton-network/core-ledger-proto'
 import { hashPreparedTransaction } from '@canton-network/core-tx-visualizer'
-import { clearSign, type OperationDescription } from './clear-sign.js'
-import { intentText } from './__tests__/helpers.js'
+import type { OperationDescription } from './clear-sign.js'
+import { described, intentText } from './__tests__/helpers.js'
 import {
     ALICE,
     BOB,
@@ -28,8 +28,13 @@ import {
     simulated,
 } from './__tests__/splice-scenarios.js'
 
-function describeOne(preparedTransaction: string): OperationDescription {
-    const { operations } = clearSign(preparedTransaction, spliceDescriptors)
+async function describeOne(
+    preparedTransaction: string
+): Promise<OperationDescription> {
+    const { operations } = await described(
+        preparedTransaction,
+        spliceDescriptors
+    )
     expect(operations).toHaveLength(1)
     return operations[0]!
 }
@@ -39,19 +44,9 @@ const describeCaptured = (id: string) =>
 
 type Field = OperationDescription['fields'][number]
 
-/**
- * Each field as label → value, `None (absent)` or `error: …`. The fields of a matched case follow
- * their field, labelled `<field label> › <case field label>`.
- */
+/** Each field as label → value, `None (absent)` or `error: …`. */
 function fields(op: OperationDescription): Record<string, string> {
-    return Object.fromEntries(flatten(op.fields, ''))
-}
-
-function flatten(list: Field[], prefix: string): [string, string][] {
-    return list.flatMap((f) => [
-        [prefix + f.label, show(f)] as [string, string],
-        ...flatten(f.fields ?? [], `${prefix}${f.label} › `),
-    ])
+    return Object.fromEntries(op.fields.map((f) => [f.label, show(f)]))
 }
 
 function show(f: Field): string {
@@ -77,7 +72,7 @@ describe('captured fixtures', () => {
         }
     )
 
-    it('needs hashing scheme V3 for a template with a contract key', () => {
+    it('needs hashing scheme V3 for a template with a contract key', async () => {
         expect(captured('gl-lock-create').hashingSchemeVersion).toBe(
             'HASHING_SCHEME_VERSION_V3'
         )
@@ -85,8 +80,8 @@ describe('captured fixtures', () => {
 })
 
 describe('governance locks', () => {
-    it('shows a vesting lock whole, with its constructor as the raw key', () => {
-        const op = describeCaptured('gl-substitution-create-fa-vesting')
+    it('shows a vesting lock whole, with its constructor as the raw key', async () => {
+        const op = await describeCaptured('gl-substitution-create-fa-vesting')
         expect(op.status).toBe('described')
         expect(intentText(op)).toBe(
             `Propose substituting 250.0000000000 of the governance lock of ${ALICE}, proposed by ${BOB}`
@@ -110,8 +105,8 @@ describe('governance locks', () => {
         })
     })
 
-    it('shows a full lock whole, and a non-trailing None', () => {
-        const op = describeCaptured('gl-substitution-create-sv-full')
+    it('shows a full lock whole, and a non-trailing None', async () => {
+        const op = await describeCaptured('gl-substitution-create-sv-full')
         expect(op.status).toBe('described')
         expect(intentText(op)).toBe(
             `Propose substituting 250.0000000000 of the governance lock of ${ALICE}, proposed by ${ALICE}`
@@ -125,8 +120,8 @@ describe('governance locks', () => {
         })
     })
 
-    it('describes a lock with a contract key', () => {
-        const op = describeCaptured('gl-lock-create')
+    it('describes a lock with a contract key', async () => {
+        const op = await describeCaptured('gl-lock-create')
         expect(intentText(op)).toBe(
             `Create a governance lock of 10000.0000000000 for ${ALICE}`
         )
@@ -137,8 +132,8 @@ describe('governance locks', () => {
         })
     })
 
-    it('keeps source.owner apart from receiver', () => {
-        const op = describeCaptured('gl-transfer-create')
+    it('keeps source.owner apart from receiver', async () => {
+        const op = await describeCaptured('gl-transfer-create')
         expect(intentText(op)).toBe(
             `Transfer 100.0000000000 of the governance locks of ${ALICE} to ${BOB}`
         )
@@ -147,9 +142,9 @@ describe('governance locks', () => {
         ])
     })
 
-    it('words V1 and V2 accepts the same, each from its own entry', () => {
-        const v1 = describeOne(simulated['gl-substitution-accept-v1']())
-        const v2 = describeOne(simulated['gl-substitution-accept-v2']())
+    it('words V1 and V2 accepts the same, each from its own entry', async () => {
+        const v1 = await describeOne(simulated['gl-substitution-accept-v1']())
+        const v2 = await describeOne(simulated['gl-substitution-accept-v2']())
         const sentence = `Accept the substitution of 250.0000000000 of the governance lock of ${ALICE}, proposed by ${BOB}`
         expect([v1.status, v2.status]).toEqual(['described', 'described'])
         expect(intentText(v1)).toBe(sentence)
@@ -167,15 +162,15 @@ describe('governance locks', () => {
         expect(fields(v2).Actors).toBe(JSON.stringify([ALICE]))
     })
 
-    it('rejects through V2 on an SV lock', () => {
-        const op = describeOne(simulated['gl-substitution-reject-sv']())
+    it('rejects through V2 on an SV lock', async () => {
+        const op = await describeOne(simulated['gl-substitution-reject-sv']())
         expect(intentText(op)).toBe(
             `Reject the substitution of 250.0000000000 proposed by ${ALICE}`
         )
     })
 
-    it('describes a captured V1 reject through the interface', () => {
-        const op = describeCaptured('gl-transfer-reject-v1')
+    it('describes a captured V1 reject through the interface', async () => {
+        const op = await describeCaptured('gl-transfer-reject-v1')
         expect(op.status).toBe('described')
         expect(op.interface?.entityName).toBe('TransferInstruction')
         expect(intentText(op)).toBe(
@@ -189,8 +184,8 @@ describe('governance lock requests through the transfer factory', () => {
     const request = (amount: string) =>
         `Request a transfer of ${amount} Amulet from ${ALICE} to ${LOCK_MANAGER}. What the receiver does with it depends on the transfer's metadata`
 
-    it('words an unlock request as a requested transfer, with the request in the metadata', () => {
-        const op = describeOne(simulated['epar-transfer-v1-unlock']())
+    it('words an unlock request as a requested transfer, with the request in the metadata', async () => {
+        const op = await describeOne(simulated['epar-transfer-v1-unlock']())
         expect(op.status).toBe('described')
         // The contract ignores this amount for an unlock; the sentence calls it requested and
         // points to the metadata, which shows the request whole
@@ -209,8 +204,10 @@ describe('governance lock requests through the transfer factory', () => {
         })
     })
 
-    it('words V2 the same, from its own entry; its sender and receiver are accounts', () => {
-        const op = describeOne(simulated['epar-transfer-v2-create-lock']())
+    it('words V2 the same, from its own entry; its sender and receiver are accounts', async () => {
+        const op = await describeOne(
+            simulated['epar-transfer-v2-create-lock']()
+        )
         expect(op.status).toBe('described')
         expect(op.interface?.moduleName).toBe(
             'Splice.Api.Token.TransferInstructionV2'
@@ -231,9 +228,9 @@ describe('governance lock requests through the transfer factory', () => {
 })
 
 describe('V1 and V2 AllocationFactory_Allocate each have their own entry', () => {
-    it('describes V2', () => {
+    it('describes V2', async () => {
         const tx = simulated['epar-allocate-v2']()
-        const op = describeOne(tx)
+        const op = await describeOne(tx)
         expect(op.status).toBe('described')
         expect(op.interface?.moduleName).toBe(
             'Splice.Api.Token.AllocationInstructionV2'
@@ -242,12 +239,12 @@ describe('V1 and V2 AllocationFactory_Allocate each have their own entry', () =>
             'Amulet administrator': DSO,
             'Number of legs': '2',
         })
-        expect(clearSign(tx, spliceDescriptors).complete).toBe(true)
+        expect((await described(tx, spliceDescriptors)).complete).toBe(true)
     })
 
-    it('describes V1', () => {
+    it('describes V1', async () => {
         const tx = simulated['epar-allocate-v1']()
-        const op = describeOne(tx)
+        const op = await describeOne(tx)
         expect(op.status).toBe('described')
         expect(op.interface?.moduleName).toBe(
             'Splice.Api.Token.AllocationInstructionV1'
@@ -255,13 +252,13 @@ describe('V1 and V2 AllocationFactory_Allocate each have their own entry', () =>
         expect(intentText(op)).toBe(
             `Allocate 75.0000000000 Amulet from ${ALICE} to ${BOB} for settlement trade-7, executed by ${PROVIDER}`
         )
-        expect(clearSign(tx, spliceDescriptors).complete).toBe(true)
+        expect((await described(tx, spliceDescriptors)).complete).toBe(true)
     })
 })
 
 describe('DSO governance', () => {
-    it('shows a SetConfig vote whole, with the action constructor in the raw value', () => {
-        const op = describeCaptured('dso-request-vote-set-config')
+    it('shows a SetConfig vote whole, with the action constructor in the raw value', async () => {
+        const op = await describeCaptured('dso-request-vote-set-config')
         expect(op.status).toBe('described')
         expect(intentText(op)).toBe(
             `Request a vote by ${ALICE}: Raise maxTextLength`
@@ -280,8 +277,8 @@ describe('DSO governance', () => {
         ).toBe('2026-11-19T16:29:56Z')
     })
 
-    it('shows tuples, Sets and an enum inside an amulet config schedule shown whole', () => {
-        const op = describeCaptured('dso-request-vote-amulet-schedule')
+    it('shows tuples, Sets and an enum inside an amulet config schedule shown whole', async () => {
+        const op = await describeCaptured('dso-request-vote-amulet-schedule')
         expect(op.status).toBe('described')
         expect(intentText(op)).toBe(
             `Request a vote by ${ALICE}: New traffic price`
@@ -312,29 +309,25 @@ describe('DSO governance', () => {
         )
     })
 
-    it('keeps sibling optional configs with the same field names apart', () => {
-        const op = describeCaptured('dso-set-synchronizer-node-config')
+    it('keeps sibling optional configs with the same field names apart', async () => {
+        const op = await describeCaptured('dso-set-synchronizer-node-config')
         expect(op.status).toBe('described')
         expect(fields(op)).toMatchObject({
-            Sequencer: 'Some',
-            'Sequencer › URL': 'https://sequencer.example.com',
-            'Sequencer › Migration': '3',
-            'Legacy sequencer': 'Some',
-            'Legacy sequencer › URL': 'https://legacy-sequencer.example.com',
-            'Legacy sequencer › Migration': '2',
-            'Sequencer identity': 'Some',
-            'Sequencer identity › Available after': 'None (absent)',
-            Mediator: 'Some',
-            'Mediator › Mediator ID': 'MED::current',
-            'Scan › Public URL': 'https://scan.example.com',
+            'Sequencer URL': 'https://sequencer.example.com',
+            'Sequencer migration': '3',
+            'Legacy sequencer URL': 'https://legacy-sequencer.example.com',
+            'Legacy sequencer migration': '2',
+            'Sequencer identity available after': 'None (absent)',
+            'Mediator ID': 'MED::current',
+            'Public URL': 'https://scan.example.com',
             'Governance keys': '1',
             'Physical synchronizers':
                 '[["1",{"sequencer":{"url":"https://psid-1.example.com"}}]]',
         })
     })
 
-    it('shows a GenMap keyed by text only as a whole', () => {
-        const op = describeCaptured('vote-request-create')
+    it('shows a GenMap keyed by text only as a whole', async () => {
+        const op = await describeCaptured('vote-request-create')
         expect(intentText(op)).toMatch(/^Vote by sv-1, open until /)
         const action = JSON.parse(fields(op)['Votes on']!)
         expect(
@@ -347,13 +340,13 @@ describe('DSO governance', () => {
 })
 
 describe('wallet and apps', () => {
-    it('reads amount.amount and an enum unit', () => {
-        const op = describeCaptured('transfer-offer-create')
+    it('reads amount.amount and an enum unit', async () => {
+        const op = await describeCaptured('transfer-offer-create')
         expect(intentText(op)).toBe(`Offer 12.5000000000 USD to ${BOB}: Lunch`)
     })
 
-    it('words a choice without arguments from the contract alone', () => {
-        const op = describeCaptured('transfer-offer-accept')
+    it('words a choice without arguments from the contract alone', async () => {
+        const op = await describeCaptured('transfer-offer-accept')
         expect(op.status).toBe('described')
         expect(intentText(op)).toBe(`Accept 12.5000000000 USD from ${ALICE}`)
         expect(fields(op)).toEqual({
@@ -363,22 +356,23 @@ describe('wallet and apps', () => {
         })
     })
 
-    it('formats an optional enum as Some, and counts an optional list', () => {
-        const op = describeCaptured('featured-app-right-create')
+    it('formats an optional enum as Some, and counts an optional list', async () => {
+        const op = await describeCaptured('featured-app-right-create')
         expect(fields(op)).toMatchObject({
             Kind: 'Asset mover',
             'Activity weight': '2.5000000000',
             'Number of operational parties': '1',
         })
         expect(op.fields.find((f) => f.label === 'Kind')).toMatchObject({
-            case: 'Some',
+            value: 'Asset mover',
+            enumKey: 'FAK_AssetMoving',
             format: 'enum',
         })
     })
 
-    it('words V1 and V2 activity markers the same; weight is V2 only', () => {
-        const v1 = describeCaptured('activity-marker-v1')
-        const v2 = describeCaptured('activity-marker-v2')
+    it('words V1 and V2 activity markers the same; weight is V2 only', async () => {
+        const v1 = await describeCaptured('activity-marker-v1')
+        const v2 = await describeCaptured('activity-marker-v2')
         expect(intentText(v1)).toBe(
             `Record activity of ${PROVIDER} for 2 beneficiaries`
         )
@@ -386,24 +380,26 @@ describe('wallet and apps', () => {
         expect(fields(v2).Weight).toBe('3.0000000000')
     })
 
-    it('indexes a TextMap of records with a quoted key', () => {
-        const op = describeCaptured('otc-trade-proposal-create')
+    it('indexes a TextMap of records with a quoted key', async () => {
+        const op = await describeCaptured('otc-trade-proposal-create')
         expect(intentText(op)).toBe(
             `Trade 100.0000000000 Amulet from ${ALICE} to ${BOB}, one of 2 legs`
         )
         expect(fields(op)['Leg 0 note']).toBe('csalice pays')
     })
 
-    it('counts the legs of the contract an accept acts on', () => {
-        const op = describeCaptured('otc-trade-proposal-accept')
+    it('counts the legs of the contract an accept acts on', async () => {
+        const op = await describeCaptured('otc-trade-proposal-accept')
         expect(intentText(op)).toBe(
             `Approve, as ${BOB}, a trade of 2 legs at ${PROVIDER}`
         )
     })
 
-    it('reads the label of a positional newtype, and shows each update whole', () => {
-        const transfer = describeCaptured('balance-update-create-transfer')
-        const netting = describeCaptured('balance-update-create-netting')
+    it('reads the label of a positional newtype, and shows each update whole', async () => {
+        const transfer = await describeCaptured(
+            'balance-update-create-transfer'
+        )
+        const netting = await describeCaptured('balance-update-create-netting')
         expect(intentText(transfer)).toBe(
             `Record a balance update in group flatmates of ${ALICE}`
         )
@@ -429,8 +425,8 @@ describe('wallet and apps', () => {
         })
     })
 
-    it('counts a list of variants, and shows it only as a whole', () => {
-        const op = describeCaptured('batching-utility-execute')
+    it('counts a list of variants, and shows it only as a whole', async () => {
+        const op = await describeCaptured('batching-utility-execute')
         expect(intentText(op)).toBe(
             `Execute 2 token standard actions as ${ALICE}`
         )
@@ -441,16 +437,16 @@ describe('wallet and apps', () => {
         ])
     })
 
-    it('reads five levels into a generic proxy argument', () => {
-        const op = describeOne(simulated['wallet-user-proxy-transfer']())
+    it('reads five levels into a generic proxy argument', async () => {
+        const op = await describeOne(simulated['wallet-user-proxy-transfer']())
         expect(op.status).toBe('described')
         expect(intentText(op)).toBe(
             `Transfer 30.0000000000 Amulet from ${ALICE} to ${BOB} via ${PROVIDER}`
         )
     })
 
-    it('shows an optional Metadata whole', () => {
-        const op = describeOne(simulated['preapproval-send-v2-memo']())
+    it('shows an optional Metadata whole', async () => {
+        const op = await describeOne(simulated['preapproval-send-v2-memo']())
         expect(intentText(op)).toBe(
             `Send 25.0000000000 Amulet from ${ALICE} to ${BOB}`
         )
@@ -463,9 +459,9 @@ describe('wallet and apps', () => {
         })
     })
 
-    it('shows trailing None fields, which the ledger leaves out, as absent', () => {
+    it('shows trailing None fields, which the ledger leaves out, as absent', async () => {
         const tx = simulated['preapproval-send-v2-plain']()
-        const op = describeOne(tx)
+        const op = await describeOne(tx)
         expect(op.status).toBe('described')
         expect(fields(op)).toMatchObject({
             // The None case matches an Optional the ledger left out of the record
@@ -473,19 +469,21 @@ describe('wallet and apps', () => {
             Metadata: 'None (absent)',
         })
         // An absent field is not a failure: the transaction is still completely described
-        expect(clearSign(tx, spliceDescriptors).complete).toBe(true)
+        expect((await described(tx, spliceDescriptors)).complete).toBe(true)
     })
 
-    it('describes the input contracts the simulations use', () => {
+    it('describes the input contracts the simulations use', async () => {
         for (const id of [
             'external-party-amulet-rules-create',
             'transfer-preapproval-create',
             'wallet-user-proxy-create',
         ]) {
-            expect(describeCaptured(id).status).toBe('described')
+            expect((await describeCaptured(id)).status).toBe('described')
         }
         expect(
-            intentText(describeCaptured('external-party-amulet-rules-create'))
+            intentText(
+                await describeCaptured('external-party-amulet-rules-create')
+            )
         ).toBe(`Amulet rules for external parties, administered by ${DSO}`)
     })
 })

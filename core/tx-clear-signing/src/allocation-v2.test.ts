@@ -9,7 +9,8 @@ import {
 } from '@canton-network/core-ledger-proto'
 import { decodePreparedTransaction } from '@canton-network/core-tx-visualizer'
 import { allocationV2Multileg } from './__tests__/fixtures/allocation-v2-multileg.js'
-import { clearSign, type OperationDescription } from './clear-sign.js'
+import type { OperationDescription } from './clear-sign.js'
+import { described } from './__tests__/helpers.js'
 import { shippedDescriptors } from './shipped.js'
 import { intentText } from './__tests__/helpers.js'
 
@@ -142,8 +143,11 @@ function field(op: OperationDescription | undefined, path: string) {
 }
 
 describe('AllocationFactory_Allocate', () => {
-    it('describes the two-leg capture', () => {
-        const result = clearSign(allocationV2Multileg, shippedDescriptors())
+    it('describes the two-leg capture', async () => {
+        const result = await described(
+            allocationV2Multileg,
+            shippedDescriptors()
+        )
         const op = result.operations[0]
 
         expect(result.complete).toBe(true)
@@ -184,8 +188,8 @@ describe('AllocationFactory_Allocate', () => {
         ])
     })
 
-    it('describes a V1 AllocationFactory_Allocate on the same template with the V1 entry', () => {
-        const result = clearSign(v1Allocate(), shippedDescriptors())
+    it('describes a V1 AllocationFactory_Allocate on the same template with the V1 entry', async () => {
+        const result = await described(v1Allocate(), shippedDescriptors())
         const op = result.operations[0]
 
         expect(result.complete).toBe(true)

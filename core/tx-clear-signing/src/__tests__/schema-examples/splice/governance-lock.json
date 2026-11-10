@@ -8,7 +8,7 @@
         }
     },
     "metadata": {
-        "version": "1.5.0",
+        "version": "1.6.0",
         "publisher": "<splice publisher>",
         "name": "Governance lock"
     },
@@ -46,9 +46,7 @@
                     "path": "originalLockCid",
                     "label": "Replaces",
                     "format": "contractId",
-                    "cases": {
-                        "None": {}
-                    }
+                    "optional": true
                 },
                 {
                     "path": "requestedAt",

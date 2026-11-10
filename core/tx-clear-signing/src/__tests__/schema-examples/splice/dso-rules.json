@@ -8,7 +8,7 @@
         }
     },
     "metadata": {
-        "version": "1.7.0",
+        "version": "1.8.0",
         "publisher": "<splice publisher>",
         "name": "DSO rules"
     },
@@ -38,17 +38,13 @@
                         "path": "voteRequestTimeout",
                         "label": "Voting period",
                         "format": "duration",
-                        "cases": {
-                            "None": {}
-                        }
+                        "optional": true
                     },
                     {
                         "path": "targetEffectiveAt",
                         "label": "Effective at",
                         "format": "dateTime",
-                        "cases": {
-                            "None": {}
-                        }
+                        "optional": true
                     },
                     {
                         "path": "action",
@@ -73,120 +69,70 @@
                         "format": "string"
                     },
                     {
-                        "path": "newNodeConfig.sequencer",
-                        "label": "Sequencer",
-                        "cases": {
-                            "Some": {
-                                "fields": [
-                                    {
-                                        "path": "sequencerId",
-                                        "label": "Sequencer ID",
-                                        "format": "string"
-                                    },
-                                    {
-                                        "path": "url",
-                                        "label": "URL",
-                                        "format": "string"
-                                    },
-                                    {
-                                        "path": "migrationId",
-                                        "label": "Migration",
-                                        "format": "number"
-                                    },
-                                    {
-                                        "path": "availableAfter",
-                                        "label": "Available after",
-                                        "format": "dateTime",
-                                        "cases": {
-                                            "None": {}
-                                        }
-                                    }
-                                ]
-                            },
-                            "None": {}
-                        }
+                        "path": "newNodeConfig.sequencer.sequencerId",
+                        "label": "Sequencer ID",
+                        "format": "string",
+                        "optional": true
                     },
                     {
-                        "path": "newNodeConfig.legacySequencerConfig",
-                        "label": "Legacy sequencer",
-                        "cases": {
-                            "Some": {
-                                "fields": [
-                                    {
-                                        "path": "sequencerId",
-                                        "label": "Sequencer ID",
-                                        "format": "string"
-                                    },
-                                    {
-                                        "path": "url",
-                                        "label": "URL",
-                                        "format": "string"
-                                    },
-                                    {
-                                        "path": "migrationId",
-                                        "label": "Migration",
-                                        "format": "number"
-                                    }
-                                ]
-                            },
-                            "None": {}
-                        }
+                        "path": "newNodeConfig.sequencer.url",
+                        "label": "Sequencer URL",
+                        "format": "string",
+                        "optional": true
                     },
                     {
-                        "path": "newNodeConfig.sequencerIdentity",
-                        "label": "Sequencer identity",
-                        "cases": {
-                            "Some": {
-                                "fields": [
-                                    {
-                                        "path": "sequencerId",
-                                        "label": "Sequencer ID",
-                                        "format": "string"
-                                    },
-                                    {
-                                        "path": "availableAfter",
-                                        "label": "Available after",
-                                        "format": "dateTime",
-                                        "cases": {
-                                            "None": {}
-                                        }
-                                    }
-                                ]
-                            },
-                            "None": {}
-                        }
+                        "path": "newNodeConfig.sequencer.migrationId",
+                        "label": "Sequencer migration",
+                        "format": "number",
+                        "optional": true
                     },
                     {
-                        "path": "newNodeConfig.mediator",
-                        "label": "Mediator",
-                        "cases": {
-                            "Some": {
-                                "fields": [
-                                    {
-                                        "path": "mediatorId",
-                                        "label": "Mediator ID",
-                                        "format": "string"
-                                    }
-                                ]
-                            },
-                            "None": {}
-                        }
+                        "path": "newNodeConfig.sequencer.availableAfter",
+                        "label": "Sequencer available after",
+                        "format": "dateTime",
+                        "optional": true
                     },
                     {
-                        "path": "newNodeConfig.scan",
-                        "label": "Scan",
-                        "cases": {
-                            "Some": {
-                                "fields": [
-                                    {
-                                        "path": "publicUrl",
-                                        "label": "Public URL",
-                                        "format": "string"
-                                    }
-                                ]
-                            },
-                            "None": {}
-                        }
+                        "path": "newNodeConfig.legacySequencerConfig.sequencerId",
+                        "label": "Legacy sequencer ID",
+                        "format": "string",
+                        "optional": true
+                    },
+                    {
+                        "path": "newNodeConfig.legacySequencerConfig.url",
+                        "label": "Legacy sequencer URL",
+                        "format": "string",
+                        "optional": true
+                    },
+                    {
+                        "path": "newNodeConfig.legacySequencerConfig.migrationId",
+                        "label": "Legacy sequencer migration",
+                        "format": "number",
+                        "optional": true
+                    },
+                    {
+                        "path": "newNodeConfig.sequencerIdentity.sequencerId",
+                        "label": "Sequencer identity ID",
+                        "format": "string",
+                        "optional": true
+                    },
+                    {
+                        "path": "newNodeConfig.sequencerIdentity.availableAfter",
+                        "label": "Sequencer identity available after",
+                        "format": "dateTime",
+                        "optional": true
+                    },
+                    {
+                        "path": "newNodeConfig.mediator.mediatorId",
+                        "label": "Mediator ID",
+                        "format": "string",
+                        "optional": true
+                    },
+                    {
+                        "path": "newNodeConfig.scan.publicUrl",
+                        "label": "Public URL",
+                        "format": "string",
+                        "optional": true
                     },
                     {
                         "path": "newNodeConfig.cometBft.governanceKeys.length",
@@ -202,9 +148,7 @@
                         "path": "newNodeConfig.physicalSynchronizers",
                         "label": "Physical synchronizers",
                         "format": "raw",
-                        "cases": {
-                            "None": {}
-                        }
+                        "optional": true
                     },
                     {
                         "path": "nodeStateCid",

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from 'vitest'
-import { clearSign } from './clear-sign.js'
+import { described } from './__tests__/helpers.js'
 import { builtinPingCreate } from './__tests__/fixtures/ping.js'
 import { shippedDescriptors } from './shipped.js'
 
@@ -10,7 +10,7 @@ const pingPackageId =
     'de2cc2f90eb523414ff54e899951dadd8789a4c07e0f71f6d6c9eaf57d412a54'
 
 describe('shippedDescriptors', () => {
-    it('fully describes the builtin Ping create', () => {
+    it('fully describes the builtin Ping create', async () => {
         const descriptor = shippedDescriptors().find(
             (d) => d.context.template.entityName === 'Ping'
         )
@@ -21,11 +21,11 @@ describe('shippedDescriptors', () => {
             entityName: 'Ping',
         })
         expect(
-            clearSign(builtinPingCreate, shippedDescriptors()).complete
+            (await described(builtinPingCreate, shippedDescriptors())).complete
         ).toBe(true)
     })
 
-    it('includes the builtin Bong proposal', () => {
+    it('includes the builtin Bong proposal', async () => {
         const descriptor = shippedDescriptors().find(
             (d) => d.context.template.entityName === 'BongProposal'
         )
@@ -49,7 +49,7 @@ describe('shippedDescriptors', () => {
         ])
     })
 
-    it('includes the rest of the builtin Bong choices', () => {
+    it('includes the rest of the builtin Bong choices', async () => {
         const byEntity = new Map(
             shippedDescriptors().map((d) => [
                 d.context.template.entityName,
@@ -69,7 +69,7 @@ describe('shippedDescriptors', () => {
         expect(byEntity.get('Bong')).toEqual(['AbortBong', 'Ack'])
     })
 
-    it('describes transfers and allocations on the external party amulet rules, per interface', () => {
+    it('describes transfers and allocations on the external party amulet rules, per interface', async () => {
         const descriptor = shippedDescriptors().find(
             (d) => d.context.template.entityName === 'ExternalPartyAmuletRules'
         )

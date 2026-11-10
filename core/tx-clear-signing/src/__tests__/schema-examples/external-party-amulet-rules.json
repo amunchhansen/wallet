@@ -8,7 +8,7 @@
         }
     },
     "metadata": {
-        "version": "2.4.0",
+        "version": "2.5.0",
         "publisher": "<splice publisher>",
         "name": "Amulet rules for external parties",
         "enums": {
@@ -99,12 +99,14 @@
                     {
                         "path": "transfer.sender.owner",
                         "label": "From",
-                        "format": "party"
+                        "format": "party",
+                        "optional": true
                     },
                     {
                         "path": "transfer.receiver.owner",
                         "label": "To",
-                        "format": "party"
+                        "format": "party",
+                        "optional": true
                     },
                     {
                         "path": "transfer.sender",
@@ -221,7 +223,8 @@
                     {
                         "path": "allocation.authorizer.owner",
                         "label": "Authorizer",
-                        "format": "party"
+                        "format": "party",
+                        "optional": true
                     },
                     {
                         "path": "allocation.admin",
@@ -250,9 +253,7 @@
                         "path": "allocation.settlementDeadline",
                         "label": "Settlement deadline",
                         "format": "dateTime",
-                        "cases": {
-                            "None": {}
-                        }
+                        "optional": true
                     },
                     {
                         "path": "actors",

@@ -175,59 +175,29 @@ describe('parseDescriptor', () => {
         expect(() => parseDescriptor({ ...ping, display })).not.toThrow()
     })
 
-    it('checks the fields of cases like any other fields', () => {
-        const withCases = (fields: unknown[], interpolatedIntent?: string) => ({
-            ...ping,
-            metadata: { ...ping.metadata, enums: { kind: { Red: 'red' } } },
-            display: {
-                create: {
-                    intent: 'Ping',
-                    interpolatedIntent,
-                    fields: [{ path: 'id', cases: { Some: { fields } } }],
-                },
-            },
-        })
-        expect(() =>
-            parseDescriptor(withCases([{ path: 'x' }, { path: 'x' }]))
-        ).toThrow("case 'Some': field 'x' is declared more than once")
-        expect(() =>
-            parseDescriptor(
-                withCases([
-                    {
-                        path: 'x',
-                        format: 'enum',
-                        params: { $ref: '$.metadata.enums.missing' },
-                    },
-                ])
-            )
-        ).toThrow("references missing enum '$.metadata.enums.missing'")
-        // A case field cannot be used in the sentence
-        expect(() =>
-            parseDescriptor(withCases([{ path: 'x' }], 'Ping {x}'))
-        ).toThrow("placeholder 'x' has no field with that path")
-        expect(() =>
-            parseDescriptor(withCases([{ path: 'x' }], 'Ping {id}'))
-        ).not.toThrow()
-    })
-
-    it('allows a format on a field with cases', () => {
+    it('allows an optional field, and rejects a non-boolean', () => {
         expect(() =>
             parseDescriptor({
                 ...ping,
                 display: {
                     create: {
                         intent: 'Ping',
-                        fields: [
-                            {
-                                path: 'id',
-                                format: 'string',
-                                cases: { None: {} },
-                            },
-                        ],
+                        fields: [{ path: 'id', optional: true }],
                     },
                 },
             })
         ).not.toThrow()
+        expect(() =>
+            parseDescriptor({
+                ...ping,
+                display: {
+                    create: {
+                        intent: 'Ping',
+                        fields: [{ path: 'id', optional: 'yes' }],
+                    },
+                },
+            })
+        ).toThrow('optional')
     })
 
     it('rejects a package ID on an exercise interface', () => {
@@ -248,40 +218,6 @@ describe('parseDescriptor', () => {
                 },
             })
         ).toThrow('interface')
-    })
-
-    it('rejects a case that is not Some or None', () => {
-        const withCases = (cases: unknown) => ({
-            ...ping,
-            display: {
-                create: {
-                    intent: 'Ping',
-                    fields: [{ path: 'id', cases }],
-                },
-            },
-        })
-        expect(() => parseDescriptor(withCases({ GLS_FullLock: {} }))).toThrow(
-            "case 'GLS_FullLock' is not 'Some' or 'None'"
-        )
-        expect(() =>
-            parseDescriptor(withCases({ Some: {}, GLS_FullLock: {} }))
-        ).toThrow("case 'GLS_FullLock' is not 'Some' or 'None'")
-    })
-
-    it('accepts an empty case, and rejects a case label', () => {
-        const withCase = (c: unknown) => ({
-            ...ping,
-            display: {
-                create: {
-                    intent: 'Ping',
-                    fields: [{ path: 'id', cases: { None: c } }],
-                },
-            },
-        })
-        expect(() => parseDescriptor(withCase({}))).not.toThrow()
-        expect(() => parseDescriptor(withCase({ label: 'not set' }))).toThrow(
-            'label'
-        )
     })
 
     it('needs create or exercises', () => {

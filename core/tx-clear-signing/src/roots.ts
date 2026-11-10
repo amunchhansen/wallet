@@ -20,6 +20,20 @@ export interface TemplateRef {
 export type RootNode =
     | { nodeId: string; kind: 'create'; create: Create }
     | { nodeId: string; kind: 'exercise'; exercise: Exercise }
+    | {
+          nodeId: string
+          kind: 'other'
+          /** `fetch`, `rollback`, or `missing` when the root has no node. */
+          nodeType: string
+          template?: TemplateRef
+      }
+
+/** The contracts a transaction's exercises can act on. */
+export interface ContractSet {
+    byId: Map<string, Create>
+    /** Contract IDs that occur more than once. Their argument is not used. */
+    duplicateIds: ReadonlySet<string>
+}
 
 export class TransactionShapeError extends Error {
     constructor(message: string) {
@@ -34,10 +48,10 @@ export function decode(tx: string): PreparedTransaction {
 }
 
 /**
- * The root nodes of the transaction, in order. Each is a create or an exercise, since a submission's
- * commands produce only those.
+ * The root nodes of the transaction, in order. A root that is not a create or an exercise is
+ * returned as `other`, so one such root does not stop the others being described.
  *
- * @throws TransactionShapeError when a root is missing or of another kind
+ * @throws TransactionShapeError when the transaction has no tree
  */
 export function rootNodes(tx: PreparedTransaction): RootNode[] {
     const transaction = tx.transaction
@@ -51,7 +65,7 @@ export function rootNodes(tx: PreparedTransaction): RootNode[] {
             (n) => n.nodeId === nodeId
         )?.versionedNode
         if (versioned?.oneofKind !== 'v1') {
-            throw new TransactionShapeError(`root node '${nodeId}' is missing`)
+            return { nodeId, kind: 'other', nodeType: 'missing' }
         }
         const nodeType = versioned.v1.nodeType
         switch (nodeType.oneofKind) {
@@ -60,11 +74,40 @@ export function rootNodes(tx: PreparedTransaction): RootNode[] {
             case 'exercise':
                 return { nodeId, kind: 'exercise', exercise: nodeType.exercise }
             default:
-                throw new TransactionShapeError(
-                    `root node '${nodeId}' is a '${nodeType.oneofKind ?? 'empty'}' node`
-                )
+                return otherRoot(nodeId, nodeType)
         }
     })
+}
+
+function otherRoot(nodeId: string, nodeType: object): RootNode {
+    const nodeTypeName =
+        'oneofKind' in nodeType && typeof nodeType.oneofKind === 'string'
+            ? nodeType.oneofKind
+            : 'empty'
+    const body = (nodeType as Record<string, unknown>)[nodeTypeName]
+    const templateId =
+        body &&
+        typeof body === 'object' &&
+        'templateId' in body &&
+        isIdentifier(body.templateId)
+            ? body.templateId
+            : undefined
+    return {
+        nodeId,
+        kind: 'other',
+        nodeType: nodeTypeName,
+        ...(templateId && { template: templateRef(templateId, nodeId) }),
+    }
+}
+
+function isIdentifier(value: unknown): value is Identifier {
+    return (
+        typeof value === 'object' &&
+        value !== null &&
+        'packageId' in value &&
+        'moduleName' in value &&
+        'entityName' in value
+    )
 }
 
 export function templateRef(
@@ -88,11 +131,10 @@ export function templateKey(t: TemplateRef): string {
 /**
  * The contracts the transaction's exercises can act on, by contract ID: its input contracts, and the
  * contracts its create nodes create. A root exercise acts on one of these; for example, a
- * create-and-exercise command creates a contract in one root and exercises it in the next.
- *
- * @throws TransactionShapeError when a contract ID occurs more than once
+ * create-and-exercise command creates a contract in one root and exercises it in the next. A contract
+ * ID that occurs more than once is recorded in `duplicateIds` and left out of `byId`.
  */
-export function contractsOf(tx: PreparedTransaction): Map<string, Create> {
+export function contractsOf(tx: PreparedTransaction): ContractSet {
     const inputs = (tx.metadata?.inputContracts ?? []).flatMap(({ contract }) =>
         contract.oneofKind === 'v1' ? [contract.v1] : []
     )
@@ -102,43 +144,57 @@ export function contractsOf(tx: PreparedTransaction): Map<string, Create> {
             ? [versionedNode.v1.nodeType.create]
             : []
     )
-    const contracts = new Map<string, Create>()
+    const byId = new Map<string, Create>()
+    const duplicateIds = new Set<string>()
     for (const create of [...inputs, ...created]) {
-        if (contracts.has(create.contractId)) {
-            throw new TransactionShapeError(
-                `contract '${create.contractId}' occurs more than once`
-            )
+        if (
+            byId.has(create.contractId) ||
+            duplicateIds.has(create.contractId)
+        ) {
+            byId.delete(create.contractId)
+            duplicateIds.add(create.contractId)
+            continue
         }
-        contracts.set(create.contractId, create)
+        byId.set(create.contractId, create)
     }
-    return contracts
+    return { byId, duplicateIds }
 }
+
+/**
+/** The create argument of an exercised contract, or why that contract cannot be read. */
+export type ContractArgument =
+    | { argument: Value | undefined }
+    | { reason: string }
 
 /**
  * The create argument of the contract an exercise acts on. The contract must be of the exercised
  * template's package name, module and entity. Its package ID may differ, because an upgrade keeps the
- * package name and changes the package ID.
- *
- * @throws TransactionShapeError when the transaction has no such contract, or it names another template
+ * package name and changes the package ID. A missing, repeated or differently named contract is
+ * reported in `reason`, so one exercise does not stop the other roots being described.
  */
 export function contractArgument(
-    contracts: Map<string, Create>,
+    contracts: ContractSet,
     exercise: Exercise
-): Value | undefined {
-    const create = contracts.get(exercise.contractId)
+): ContractArgument {
+    if (contracts.duplicateIds.has(exercise.contractId)) {
+        return {
+            reason: `contract '${exercise.contractId}' occurs more than once`,
+        }
+    }
+    const create = contracts.byId.get(exercise.contractId)
     if (!create) {
-        throw new TransactionShapeError(
-            `contract '${exercise.contractId}' is neither an input contract nor created by the transaction`
-        )
+        return {
+            reason: `contract '${exercise.contractId}' is neither an input contract nor created by the transaction`,
+        }
     }
     const actual = qualifiedName(create.packageName, create.templateId)
     const expected = qualifiedName(exercise.packageName, exercise.templateId)
     if (actual !== expected) {
-        throw new TransactionShapeError(
-            `contract '${exercise.contractId}' is '${actual}', not '${expected}'`
-        )
+        return {
+            reason: `contract '${exercise.contractId}' is '${actual}', not '${expected}'`,
+        }
     }
-    return create.argument
+    return { argument: create.argument }
 }
 
 function qualifiedName(

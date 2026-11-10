@@ -8,7 +8,7 @@
         }
     },
     "metadata": {
-        "version": "1.5.0",
+        "version": "1.6.0",
         "publisher": "<splice publisher>",
         "name": "Featured app right",
         "enums": {
@@ -36,33 +36,25 @@
                     "params": {
                         "$ref": "$.metadata.enums.appKind"
                     },
-                    "cases": {
-                        "None": {}
-                    }
+                    "optional": true
                 },
                 {
                     "path": "activityWeight",
                     "label": "Activity weight",
                     "format": "number",
-                    "cases": {
-                        "None": {}
-                    }
+                    "optional": true
                 },
                 {
                     "path": "opsParties",
                     "label": "Operational parties",
                     "format": "raw",
-                    "cases": {
-                        "None": {}
-                    }
+                    "optional": true
                 },
                 {
                     "path": "opsParties.length",
                     "label": "Number of operational parties",
                     "format": "number",
-                    "cases": {
-                        "None": {}
-                    }
+                    "optional": true
                 }
             ]
         },
@@ -121,9 +113,7 @@
                         "path": "weight",
                         "label": "Weight",
                         "format": "number",
-                        "cases": {
-                            "None": {}
-                        }
+                        "optional": true
                     }
                 ]
             }

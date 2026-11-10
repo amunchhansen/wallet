@@ -56,13 +56,13 @@ describe('resolvePath', () => {
         })
     })
 
-    it('marks a value reached through a Some at any step as optional', () => {
+    it('unwraps a Some at any step', () => {
         expect(
             resolvePath(
                 record('x', some(record('y', int(1)))),
                 parsePath('x.y')
             )
-        ).toEqual({ value: int(1), some: true })
+        ).toEqual({ value: int(1) })
         expect(
             resolvePath(record('x', record('y', int(1))), parsePath('x.y'))
         ).toEqual({ value: int(1) })

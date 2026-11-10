@@ -345,6 +345,7 @@ const factoryTemplate = {
 
 const clearSigning: ClearSigningResult = {
     complete: false,
+    hash: 'preview',
     operations: [
         {
             nodeId: '0',

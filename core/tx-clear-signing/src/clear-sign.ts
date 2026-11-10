@@ -1,7 +1,8 @@
 // Copyright (c) 2025-2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { Create, Value } from '@canton-network/core-ledger-proto'
+import type { Value } from '@canton-network/core-ledger-proto'
+import { hashForReview } from '@canton-network/core-tx-visualizer'
 import type {
     Descriptor,
     Exercise,
@@ -9,10 +10,9 @@ import type {
     Format,
     Operation,
 } from './descriptor.js'
-import { FormatError, formatValue, type EnumTables } from './format.js'
+import { FormatError, enumKey, formatValue, type EnumTables } from './format.js'
 import { CONTRACT_PREFIX, parseIntent } from './intent.js'
 import {
-    describeKind,
     isNone,
     parsePath,
     PathError,
@@ -26,6 +26,7 @@ import {
     rootNodes,
     templateKey,
     templateRef,
+    type ContractSet,
     type RootNode,
     type TemplateRef,
 } from './roots.js'
@@ -39,18 +40,13 @@ export interface DescribedField {
     /** The descriptor field's format, when it declares one. The wallet quotes `string` values. */
     format?: Format
     /**
-     * True when a field with cases is `None` because the value is not in the transaction. The ledger
+     * True when an optional field is `None` because the value is not in the transaction. The ledger
      * leaves trailing `None` fields out, so this is usually an unset optional; it is also what a
      * mistyped path looks like, so the wallet shows that the value was inferred.
      */
     absent?: true
-    /**
-     * For a field with cases: `Some` or `None`. `value` is that name, or, when the field declares a
-     * format, the formatted `Some`.
-     */
-    case?: string
-    /** The fields of the matched case, resolved against the value the case matched. */
-    fields?: DescribedField[]
+    /** For an enum field: the constructor, or `true`/`false`, that the table mapped. */
+    enumKey?: string
 }
 
 /**
@@ -82,20 +78,27 @@ export interface DescriptorInfo {
  */
 export interface OperationDescription {
     nodeId: string
-    kind: 'create' | 'exercise'
-    template: TemplateRef
+    kind: 'create' | 'exercise' | 'other'
+    /** Absent when a root is not a create or an exercise and carries no template. */
+    template?: TemplateRef
     /** The exercised choice's name. Absent for a create. */
     choiceId?: string
     /** The interface the choice is exercised through, if any. */
     interface?: TemplateRef
+    /** For a root that is not a create or an exercise: the node's kind, such as `fetch`. */
+    nodeType?: string
+    /** Why a root is `undescribable`. */
+    reason?: string
     /** The descriptor bound to the node, whether or not it has an entry for it. */
     descriptor?: DescriptorInfo
     /**
      * `described`: the interpolated intent rendered. `fallback`: a placeholder failed, so `intent` is
      * the descriptor's stable intent. `undescribed`: no descriptor covers the node, so `intent` is
-     * generic.
+     * generic. `undescribable`: the node itself cannot be read (its contract is missing or
+     * ambiguous, or it is not a create or an exercise); `reason` says why. `status` is about the
+     * intent. `complete` is false when any root is not `described` or any field has an error.
      */
-    status: 'described' | 'fallback' | 'undescribed'
+    status: 'described' | 'fallback' | 'undescribed' | 'undescribable'
     intent: IntentPart[]
     fields: DescribedField[]
 }
@@ -103,12 +106,21 @@ export interface OperationDescription {
 export interface ClearSigningResult {
     /** True when every root is described and every field rendered. */
     complete: boolean
+    /** The hash of the described transaction, equal to `expectedHash`. */
+    hash: string
     operations: OperationDescription[]
+}
+
+export class HashMismatchError extends Error {
+    constructor(expectedHash: string) {
+        super(`prepared transaction does not hash to '${expectedHash}'`)
+        this.name = 'HashMismatchError'
+    }
 }
 
 type Header = Pick<
     OperationDescription,
-    'nodeId' | 'kind' | 'template' | 'choiceId' | 'interface'
+    'nodeId' | 'kind' | 'template' | 'choiceId' | 'interface' | 'nodeType'
 >
 
 /** The descriptor entry for a node, and the values its paths resolve against. */
@@ -125,17 +137,25 @@ interface Selected {
  * Describes each root node of a prepared transaction with the descriptor bound to it. Child nodes
  * are consequences of their root's choice, which the root's descriptor words.
  *
- * The description is only as trustworthy as its binding to what is signed: call this on bytes whose
- * hash has been checked, which also rejects a transaction with duplicate or unreachable nodes.
+ * The description is only as trustworthy as its binding to what is signed. `expectedHash` is the hash
+ * the user is asked to approve; the transaction is described only when it hashes to that value.
+ * Hashing also rejects a transaction with duplicate or unreachable nodes.
  *
  * @param tx - the prepared transaction, base64-encoded
  * @param descriptors - descriptors already validated with `parseDescriptor`; at most one per template
+ * @param expectedHash - the hash the transaction must have, as base64
+ * @throws HashMismatchError when the transaction does not hash to `expectedHash`
  * @throws Error when two descriptors bind the same template, or the transaction is malformed
  */
-export function clearSign(
+export async function clearSign(
     tx: string,
-    descriptors: readonly Descriptor[]
-): ClearSigningResult {
+    descriptors: readonly Descriptor[],
+    expectedHash: string
+): Promise<ClearSigningResult> {
+    const hash = await hashForReview(tx, expectedHash)
+    if (hash === undefined) {
+        throw new HashMismatchError(expectedHash)
+    }
     const prepared = decode(tx)
     const byTemplate = indexByTemplate(descriptors)
     const contracts = contractsOf(prepared)
@@ -143,15 +163,13 @@ export function clearSign(
         describeNode(node, contracts, byTemplate)
     )
     const complete = operations.every(
-        (op) => op.status === 'described' && op.fields.every(resolvedFully)
+        (op) => op.status === 'described' && op.fields.every(resolved)
     )
-    return { complete, operations }
+    return { complete, hash, operations }
 }
 
-function resolvedFully(field: DescribedField): boolean {
-    return (
-        field.error === undefined && (field.fields ?? []).every(resolvedFully)
-    )
+function resolved(field: DescribedField): boolean {
+    return field.error === undefined
 }
 
 function indexByTemplate(
@@ -170,14 +188,25 @@ function indexByTemplate(
 
 function describeNode(
     node: RootNode,
-    contracts: Map<string, Create>,
+    contracts: ContractSet,
     byTemplate: Map<string, Descriptor>
 ): OperationDescription {
     const header = nodeHeader(node)
-    const descriptor = byTemplate.get(templateKey(header.template))
-    const selected = descriptor && selectOperation(node, descriptor, contracts)
+    if (node.kind === 'other') {
+        return undescribable(
+            header,
+            `root node '${node.nodeId}' is a '${node.nodeType}' node`
+        )
+    }
+    const descriptor = header.template
+        ? byTemplate.get(templateKey(header.template))
+        : undefined
     const bound = descriptor && { descriptor: descriptorInfo(descriptor) }
-    if (!selected) {
+    const selected = descriptor && selectOperation(node, descriptor, contracts)
+    if (selected?.reason) {
+        return { ...undescribable(header, selected.reason), ...bound }
+    }
+    if (!selected?.selected) {
         return {
             ...header,
             ...bound,
@@ -186,10 +215,28 @@ function describeNode(
             fields: [],
         }
     }
-    return { ...header, ...bound, ...describeOperation(selected) }
+    return { ...header, ...bound, ...describeOperation(selected.selected) }
+}
+
+function undescribable(header: Header, reason: string): OperationDescription {
+    return {
+        ...header,
+        status: 'undescribable',
+        reason,
+        intent: [text(genericIntent(header))],
+        fields: [],
+    }
 }
 
 function nodeHeader(node: RootNode): Header {
+    if (node.kind === 'other') {
+        return {
+            nodeId: node.nodeId,
+            kind: 'other',
+            nodeType: node.nodeType,
+            ...(node.template && { template: node.template }),
+        }
+    }
     if (node.kind === 'create') {
         return {
             nodeId: node.nodeId,
@@ -210,25 +257,36 @@ function nodeHeader(node: RootNode): Header {
 }
 
 function genericIntent(header: Header): string {
+    if (header.kind === 'other' || !header.template) {
+        return `Cannot describe ${header.nodeType ?? 'this'} node`
+    }
     const typeName = `${header.template.moduleName}:${header.template.entityName}`
     return header.kind === 'create'
         ? `Create ${typeName}`
         : `Exercise ${header.choiceId} on ${typeName}`
 }
 
+interface Attempt {
+    selected?: Selected
+    reason?: string
+}
+
 function selectOperation(
     node: RootNode,
     descriptor: Descriptor,
-    contracts: Map<string, Create>
-): Selected | undefined {
+    contracts: ContractSet
+): Attempt | undefined {
+    if (node.kind !== 'create' && node.kind !== 'exercise') return undefined
     if (node.kind === 'create') {
         const op = descriptor.display.create
         return (
             op && {
-                descriptor,
-                op,
-                argument: node.create.argument,
-                contract: undefined,
+                selected: {
+                    descriptor,
+                    op,
+                    argument: node.create.argument,
+                    contract: undefined,
+                },
             }
         )
     }
@@ -238,14 +296,17 @@ function selectOperation(
         node.exercise.choiceId,
         interfaceId && templateRef(interfaceId, node.nodeId)
     )
-    return (
-        op && {
+    if (!op) return undefined
+    const lookedUp = contractArgument(contracts, node.exercise)
+    if ('reason' in lookedUp) return { reason: lookedUp.reason }
+    return {
+        selected: {
             descriptor,
             op,
             argument: node.exercise.chosenValue,
-            contract: contractArgument(contracts, node.exercise),
-        }
-    )
+            contract: lookedUp.argument,
+        },
+    }
 }
 
 /**
@@ -318,10 +379,9 @@ function startOf(path: string, selected: Selected): Value | undefined {
 }
 
 /**
- * Resolves and formats a field. A field without cases fails on `None`, whether the ledger kept it or
- * left it out: an optional value is shown through cases. A field with cases fails unless the value is
- * optional, and on a `Some` or `None` it does not list, except a `Some` that its declared format
- * accepts. It shows `Some` or `None`, or that formatted value.
+ * Resolves and formats a field. A field fails on `None`, whether the ledger kept it or left it out,
+ * unless it is `optional`: then `None` is shown as None and a `Some` is formatted (raw, when the
+ * field declares no format).
  */
 function describeField(
     field: Field,
@@ -331,42 +391,25 @@ function describeField(
     const label = field.label ?? field.path
     try {
         const resolved = resolveField(field, start)
-        if (field.cases) {
-            const shape = shapeOf(resolved)
-            const matched = field.cases[shape.name]
-            const formatted =
-                shape.name !== 'None' && field.format !== undefined
-            if (!matched && !formatted) {
-                throw shape.name === 'None'
-                    ? noneError(field, resolved)
-                    : new PathError(
-                          `'${field.path}' has no case '${shape.name}'`
-                      )
-            }
+        if (isNone(resolved.value)) {
+            if (!field.optional) throw noneError(field, resolved)
             return {
                 label,
                 path: field.path,
-                value: formatted
-                    ? formatValue(resolved.value, field, enums)
-                    : shape.name,
-                case: shape.name,
-                ...(formatted && declaredFormat(field)),
-                ...(matched?.fields && {
-                    fields: matched.fields.map((f) =>
-                        describeField(f, shape.payload, enums)
-                    ),
-                }),
+                value: 'None',
                 ...(resolved.absentField !== undefined && {
                     absent: true as const,
                 }),
             }
         }
-        if (isNone(resolved.value)) throw noneError(field, resolved)
         return {
             label,
             path: field.path,
             value: formatValue(resolved.value, field, enums),
             ...declaredFormat(field),
+            ...(field.format === 'enum' && {
+                enumKey: enumKey(resolved.value),
+            }),
         }
     } catch (err) {
         if (!(err instanceof PathError || err instanceof FormatError)) {
@@ -400,23 +443,6 @@ function noneError(field: Field, resolved: Resolved): PathError {
         resolved.absentField === undefined
             ? `'${field.path}' is None`
             : `'${resolved.absentField}' is not in the transaction`
-    )
-}
-
-interface Shape {
-    name: string
-    payload?: Value
-}
-
-// The shape a field with cases is matched on, and the value its case fields start at. Cases apply
-// only to an optional value. Some is already unwrapped, so an Optional holding a variant or an enum
-// is Some, and the case fields start at what it holds.
-function shapeOf(resolved: Resolved): Shape {
-    const { value } = resolved
-    if (isNone(value)) return { name: 'None' }
-    if (resolved.some) return { name: 'Some', payload: value }
-    throw new PathError(
-        `cases applied to ${describeKind(value)}, which is not optional`
     )
 }
 

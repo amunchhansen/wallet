@@ -29,17 +29,20 @@ const OPERATION_STATUS_LABELS: Record<
 > = {
     fallback: 'Partly described',
     undescribed: 'Not described',
+    undescribable: 'Cannot describe',
 }
 
 const OPERATION_KIND_LABELS: Record<OperationDescription['kind'], string> = {
     create: 'Create',
     exercise: 'Exercise',
+    other: 'Other',
 }
 
 const OPERATION_KIND_BADGE_CLASS: Record<OperationDescription['kind'], string> =
     {
         create: 'text-bg-secondary',
         exercise: 'text-bg-primary',
+        other: 'text-bg-warning',
     }
 
 /** Emitted when the user clicks the "Approve" button */
@@ -350,12 +353,6 @@ class WgTransactionDetail extends BaseElement {
                 color: var(--wg-text);
                 font-size: var(--wg-font-size-sm);
                 word-break: break-word;
-            }
-
-            .operation-fields dd.case-fields {
-                grid-column: 1 / -1;
-                padding-left: var(--wg-space-3);
-                border-left: 2px solid var(--wg-border);
             }
 
             .actions {
@@ -717,7 +714,7 @@ function renderValue(value: string, format?: DescribedField['format']) {
 }
 
 function renderOperationOrigin(op: OperationDescription) {
-    const { choiceId, descriptor } = op
+    const { choiceId, descriptor, template } = op
     return html`<dl class="operation-origin">
         ${
             op.kind === 'exercise' && choiceId !== undefined
@@ -734,10 +731,22 @@ function renderOperationOrigin(op: OperationDescription) {
                       </dd>`
                 : nothing
         }
-        <dt class="label">${op.kind === 'exercise' ? 'On' : 'Template'}</dt>
-        <dd class="identifier">${typeName(op.template)}</dd>
-        <dt class="label">Package</dt>
-        <dd class="identifier">${op.template.packageId}</dd>
+        ${
+            op.reason
+                ? html`<dt class="label">Why</dt>
+                      <dd class="text-warning-emphasis">${op.reason}</dd>`
+                : nothing
+        }
+        ${
+            template
+                ? html`<dt class="label">
+                          ${op.kind === 'exercise' ? 'On' : 'Template'}
+                      </dt>
+                      <dd class="identifier">${typeName(template)}</dd>
+                      <dt class="label">Package</dt>
+                      <dd class="identifier">${template.packageId}</dd>`
+                : nothing
+        }
         ${
             descriptor
                 ? html`<dt class="label">Described by</dt>
@@ -750,20 +759,12 @@ function renderOperationOrigin(op: OperationDescription) {
     </dl>`
 }
 
-// The fields of a matched case are shown under their field, across both columns.
 function renderFields(fields: DescribedField[]): unknown {
     return html`<dl class="operation-fields">
         ${fields.map(
             (field) => html`
                 <dt class="label">${field.label}</dt>
                 <dd>${renderFieldValue(field)}</dd>
-                ${
-                    field.fields?.length
-                        ? html`<dd class="case-fields">
-                              ${renderFields(field.fields)}
-                          </dd>`
-                        : nothing
-                }
             `
         )}
     </dl>`
@@ -780,11 +781,18 @@ function renderFieldValue(field: DescribedField) {
     }
     // The ledger leaves trailing None fields out of a record, so a missing field is shown as None.
     // A mistyped descriptor path looks the same, so the user is told the value was inferred.
+    const shown = html`${renderValue(field.value, field.format)}${
+        field.enumKey !== undefined
+            ? html`<span class="small text-body-secondary">
+                  (${field.enumKey})</span
+              >`
+            : nothing
+    }`
     if (field.absent) {
-        return html`${renderValue(field.value, field.format)}
+        return html`${shown}
             <span class="small text-warning-emphasis"
                 >(not in the transaction)</span
             >`
     }
-    return renderValue(field.value, field.format)
+    return shown
 }

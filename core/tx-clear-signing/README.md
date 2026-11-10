@@ -50,36 +50,37 @@ An input contract read by `@.contract.` paths may have been created under an ear
 
 ## Optional values
 
-A Daml `Optional` is shown through `cases`, whose only keys are `Some` and `None`. A field without cases fails when its value is `None`, which makes the transaction incomplete. The ledger leaves trailing `None` fields out of a record, and an upgrade only appends optional fields, so a record field that is not in the record is `None`; for a field without cases, that is the same failure, which is also how a mistyped path shows. A `None` at any step of a path makes the value `None`, and a `Some` is unwrapped at every step.
+A field fails when its value is `None`, which makes the transaction incomplete. The ledger leaves trailing `None` fields out of a record, and an upgrade only appends optional fields, so a record field that is not in the record is `None`; that is the same failure, and it is also how a mistyped path shows. A `None` at any step of a path makes the value `None`, and a `Some` is unwrapped at every step.
 
-A field with cases fails unless the value is optional. A `None` it does not list fails the field, and so does a `Some` when the field declares no `format`. The field shows `Some` or `None`. With a `format`, a `Some` is shown formatted instead, and the format fails on a value it does not accept. An `Optional` holding a variant or an enum is `Some`, and the format renders what it holds:
+Set `optional` to `true` when the path may pass through an `Optional`. `None` is shown as `None`, and a `Some` is shown with `format` (raw, when the field declares none). An `Optional` holding a variant or an enum is unwrapped, and the format renders what it holds.
 
 ```json
 {
     "path": "settlementDeadline",
     "label": "Settlement deadline",
     "format": "dateTime",
-    "cases": { "None": {} }
+    "optional": true
 }
 ```
 
-The fields of a `Some` are shown under the field, and their paths start at the value inside the `Some`. A variant is not described with cases. A path does not step into one, and a field shows it whole with `raw`, or with `enum` when it has no payload.
+A name step on a variant enters that constructor and fails on any other. A variant that can hold several shapes is shown whole with `raw`. An enum field's `enumKey` is the constructor the table mapped.
 
-A placeholder shows what the field shows, `Some`, `None` or a formatted value, as a value read from the transaction.
+A placeholder shows what the field shows, `None` or a formatted value, as a value read from the transaction.
 
 ## Identifying the operation
 
 Every `OperationDescription` says what the node is, whether or not a descriptor covers it:
 
-| Field        | Value                                                                                                                                                                                                           | Source      |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| `kind`       | `create` or `exercise`                                                                                                                                                                                          | transaction |
-| `template`   | package ID, module and entity of the created or exercised template                                                                                                                                              | transaction |
-| `choiceId`   | the exercised choice's name; with `template`, this selects the descriptor entry (exercise only)                                                                                                                 | transaction |
-| `interface`  | package ID, module and entity of the interface the choice is exercised through, if any                                                                                                                          | transaction |
-| `descriptor` | `name`, `publisher`, `version` and `url?` from the bound descriptor's `metadata`, whether or not it has an entry for this node                                                                                  | descriptor  |
-| `intent`     | the wording, as parts: `text` from the descriptor, and `value` read from the transaction                                                                                                                        | descriptor  |
-| `fields`     | one label and formatted value, or an `error`, per field. A field with cases has `case` (`Some` or `None`), the matched case's own `fields`, and `absent: true` when its `None` is a field the record leaves out | descriptor  |
+| Field        | Value                                                                                                                                                                                   | Source      |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| `kind`       | `create`, `exercise`, or `other` for a root that is neither                                                                                                                             | transaction |
+| `template`   | package ID, module and entity of the created or exercised template, when the node has one                                                                                               | transaction |
+| `choiceId`   | the exercised choice's name; with `template`, this selects the descriptor entry (exercise only)                                                                                         | transaction |
+| `interface`  | package ID, module and entity of the interface the choice is exercised through, if any                                                                                                  | transaction |
+| `descriptor` | `name`, `publisher`, `version` and `url?` from the bound descriptor's `metadata`, whether or not it has an entry for this node                                                          | descriptor  |
+| `intent`     | the wording, as parts: `text` from the descriptor, and `value` read from the transaction                                                                                                | descriptor  |
+| `status`     | `described`, `fallback`, `undescribed`, or `undescribable`. `complete` is false when any root is not `described` or any field has an error. `reason` says why a root is `undescribable` | both        |
+| `fields`     | one label and formatted value, or an `error`, per field. An optional `None` the record leaves out has `absent: true`. An enum field has `enumKey`, the constructor the table mapped     | descriptor  |
 
 A wallet shows `kind`, `choiceId` (followed by `via <interface>` when there is one), `template` and its package ID next to the intent, and shows `descriptor` as the descriptor's own claim (`Described by <name> v<version> by <publisher>`). The header is read from the signed transaction, so a descriptor cannot change which action or choice the user is told about. `descriptor` is unauthenticated in v1, because descriptors carry no verified signature yet.
 
@@ -89,5 +90,5 @@ A template can implement two interfaces with a choice of the same name, such as 
 
 The description is only as trustworthy as its binding to what is signed. The wallet binds them in two steps:
 
-1. The approve page computes the hash from the transaction bytes it describes (`hashForReview` in `@canton-network/core-tx-visualizer`), shows that hash, and sends it with the user's `sign` request. If the bytes do not reproduce the hash the gateway reports, approval is disabled.
+1. `clearSign` describes the transaction only when `hashForReview` (in `@canton-network/core-tx-visualizer`) reproduces `expectedHash`, and returns that hash. The approve page passes the hash the gateway reports. A mismatch throws `HashMismatchError` and approval is disabled.
 2. `TransactionService.sign` recomputes the hash from the stored transaction and signs only if it equals both the stored hash and the hash the user approved. It logs the approval (user, party, hash, time) before anything reaches the signing provider. A service account's automated `signAndExecute` has no reviewer; its approval is logged as the service account's.

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { z } from 'zod'
+import { UNSAFE_CLASS } from './format.js'
 import { parseIntent } from './intent.js'
 
 // The patterns are those of canton-clear-signing-v1.schema.json. The conformance test runs the
@@ -19,17 +20,22 @@ const identifier = new RegExp(`^${NAME}$`)
 const dottedName = new RegExp(`^${NAME}(?:\\.${NAME})*$`)
 /** A path of an exercise field, which may read the exercised contract. */
 const pathPattern = new RegExp(`^(?:${STEPS}|@\\.contract\\.${STEPS})$`)
-/** A path of a create field or a case field: there is no contract to read. */
-const relativePathPattern = new RegExp(`^${STEPS}$`)
+/** A path of a create field: there is no contract to read. */
+const argumentPathPattern = new RegExp(`^${STEPS}$`)
 const enumRef = new RegExp(`^\\$\\.metadata\\.enums\\.${NAME}$`)
 const semver =
     /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$/
-/** One line with a non-whitespace character. */
-const displayText = /^[^\r\n]*\S[^\r\n]*$/
-/** One line without leading or trailing whitespace. */
-const trimmedLine = /^\S(?:[^\r\n]*\S)?$/
+const safe = `[^${UNSAFE_CLASS}]`
+const nonSpace = `[^\\s${UNSAFE_CLASS}]`
+/** Display text: a non-whitespace character, and no control or format characters. */
+const displayText = new RegExp(`^${safe}*${nonSpace}${safe}*$`, 'u')
+/** Display text with no leading or trailing whitespace. */
+const trimmedLine = new RegExp(`^${nonSpace}(?:${safe}*${nonSpace})?$`, 'u')
 /** Like `trimmedLine`, and without braces, so it cannot contain a placeholder. */
-const stableIntent = /^[^\s{}](?:[^\r\n{}]*[^\s{}])?$/
+const stableIntent = new RegExp(
+    `^[^\\s{}${UNSAFE_CLASS}](?:${safe}*[^\\s{}${UNSAFE_CLASS}])?$`,
+    'u'
+)
 
 const FORMATS = [
     'string',
@@ -43,18 +49,14 @@ const FORMATS = [
     'raw',
 ] as const
 
-/** A value to display. With `cases`, the field lists whether an Optional is `Some` or `None`. */
+/** A value to display. `optional` allows the value to be None. */
 export interface Field {
     path: string
     label?: string | undefined
     format?: Format | undefined
     params?: { $ref: string } | undefined
-    cases?: Record<string, Case> | undefined
-}
-
-/** A `Some` or `None` an optional value may have, and the fields of a `Some`. */
-export interface Case {
-    fields?: Field[] | undefined
+    /** True when the path may pass through an Optional. None is shown as None. */
+    optional?: boolean | undefined
 }
 
 function fieldSchema(path: RegExp) {
@@ -66,7 +68,7 @@ function fieldSchema(path: RegExp) {
             params: z
                 .strictObject({ $ref: z.string().regex(enumRef) })
                 .optional(),
-            cases: CasesSchema.optional(),
+            optional: z.boolean().optional(),
         })
         .refine((f) => (f.format === 'enum') === (f.params !== undefined), {
             message:
@@ -74,44 +76,20 @@ function fieldSchema(path: RegExp) {
         })
 }
 
-const FieldSchema: z.ZodType<Field> = z.lazy(() => fieldSchema(pathPattern))
-const CaseFieldSchema: z.ZodType<Field> = z.lazy(() =>
-    fieldSchema(relativePathPattern)
-)
-const CaseSchema: z.ZodType<Case> = z.lazy(() =>
-    z.strictObject({
-        fields: z.array(CaseFieldSchema).min(1).optional(),
-    })
-)
-const CasesSchema = z
-    .record(z.string(), CaseSchema)
-    .superRefine((cases, ctx) => {
-        const names = Object.keys(cases)
-        if (names.length === 0) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'cases needs at least one entry',
-            })
-        }
-        for (const name of names) {
-            if (name !== 'Some' && name !== 'None') {
-                ctx.addIssue({
-                    code: 'custom',
-                    message: `case '${name}' is not 'Some' or 'None'`,
-                })
-            }
-        }
-    })
+/** A field of a create: its path starts at the create argument. */
+const ArgumentFieldSchema: z.ZodType<Field> = fieldSchema(argumentPathPattern)
+/** A field of an exercise: its path may read the exercised contract. */
+const ExerciseFieldSchema: z.ZodType<Field> = fieldSchema(pathPattern)
 
 function operationSchema(field: z.ZodType<Field>) {
     return z.strictObject({
         intent: z.string().regex(stableIntent),
-        interpolatedIntent: z.string().optional(),
+        interpolatedIntent: z.string().regex(displayText).optional(),
         fields: z.array(field).optional(),
     })
 }
 
-const CreateSchema = operationSchema(CaseFieldSchema)
+const CreateSchema = operationSchema(ArgumentFieldSchema)
 
 const TemplateIdSchema = z.strictObject({
     packageId: z.string().regex(/^[0-9a-f]{64}$/),
@@ -126,7 +104,7 @@ const InterfaceSchema = z.strictObject({
 })
 
 /** One choice of the template, optionally only when exercised through one interface. */
-const ExerciseSchema = operationSchema(FieldSchema).extend({
+const ExerciseSchema = operationSchema(ExerciseFieldSchema).extend({
     choice: z.string().regex(identifier),
     interface: InterfaceSchema.optional(),
 })
@@ -260,8 +238,7 @@ function operationProblems(
     return problems
 }
 
-// Checks a list of fields and, recursively, the fields of their cases: each list declares a path
-// once, and every enum reference names a table.
+// Checks that a list of fields declares each path once, and that every enum reference names a table.
 function fieldProblems(
     d: Descriptor,
     where: string,
@@ -282,20 +259,11 @@ function fieldProblems(
                 `${where}: field '${f.path}' references missing enum '${f.params?.$ref}'`
             )
         }
-        for (const [name, c] of Object.entries(f.cases ?? {})) {
-            problems.push(
-                ...fieldProblems(
-                    d,
-                    `${where}: field '${f.path}' case '${name}'`,
-                    c.fields ?? []
-                )
-            )
-        }
     }
     return problems
 }
 
-// The paths an interpolatedIntent may name: the operation's own fields, not the fields of their cases.
+// The paths an interpolatedIntent may name: the operation's fields.
 function fieldPaths(op: Operation): string[] {
     return (op.fields ?? []).map((f) => f.path)
 }

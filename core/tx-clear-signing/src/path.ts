@@ -66,27 +66,21 @@ export interface Resolved {
      * be `None`. A mistyped path looks the same, so the caller shows that the value was inferred.
      */
     absentField?: string
-    /**
-     * True when the path passed through a `Some`, at any step, so its value is optional; `value` is
-     * the value the `Some` held.
-     */
-    some?: true
 }
 
 const NONE: Value = { sum: { oneofKind: 'optional', optional: {} } }
 
 /**
- * Resolves the steps of a path against a Daml value. A name step selects a record field by label.
- * `Some` is unwrapped at every step. A name step never enters a variant: a variant is shown whole.
- * A `None` at any step, or a record field that is not in the record, resolves the whole path to
- * `None`; for a missing field, `absentField` is set. A final `length` step on a list or text map
- * yields its number of elements as an int64.
+ * Resolves the steps of a path against a Daml value. A name step selects a record field by label, or
+ * the payload of a variant with that constructor. `Some` is unwrapped at every step. A `None` at any
+ * step, or a record field that is not in the record, resolves the whole path to `None`; for a
+ * missing field, `absentField` is set. A final `length` step on a list or text map yields its number
+ * of elements as an int64.
  *
  * @throws PathError when a step does not resolve
  */
 export function resolvePath(root: Value, steps: Step[]): Resolved {
     let current = root
-    let some = false
     for (const [i, step] of steps.entries()) {
         const v = unwrapSome(current)
         if (isNone(v)) {
@@ -95,12 +89,9 @@ export function resolvePath(root: Value, steps: Step[]): Resolved {
         if (step.kind === 'name' && lacksField(v, step.name)) {
             return { value: NONE, absentField: step.name }
         }
-        some ||= v !== current
         current = applyStep(v, step, i === steps.length - 1)
     }
-    const value = unwrapSome(current)
-    some ||= value !== current
-    return some ? { value, some: true } : { value }
+    return { value: unwrapSome(current) }
 }
 
 function lacksField(v: Value, name: string): boolean {
@@ -143,9 +134,12 @@ function selectName(v: Value, name: string, isLast: boolean): Value {
             return present(field?.value)
         }
         case 'variant':
-            throw new PathError(
-                `'${name}' applied to variant '${sum.variant.constructor}'; a variant is shown whole`
-            )
+            if (sum.variant.constructor !== name) {
+                throw new PathError(
+                    `variant is constructor '${sum.variant.constructor}', not '${name}'`
+                )
+            }
+            return present(sum.variant.value)
         case 'list':
             if (name === 'length' && isLast) {
                 return int64(sum.list.elements.length)

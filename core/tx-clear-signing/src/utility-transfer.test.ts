@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from 'vitest'
-import { clearSign } from './clear-sign.js'
 import { parseDescriptor } from './descriptor.js'
-import { intentText } from './__tests__/helpers.js'
+import { described, intentText } from './__tests__/helpers.js'
 import { utilityTransferAccept } from './__tests__/fixtures/utility-transfer-accept.js'
 import transferOffer from './__tests__/schema-examples/utility-transfer-offer.json'
 
@@ -16,8 +15,8 @@ const TRANSFER_RULE =
     '00668dfdb083bfbd87aa6ddedcaea0c31623cb849373b15b6f498d2a2392af628bca1212206c197fdabdcab626a128f5cf7cb36dfc4f180a388d812befc326c90e309f29ef'
 
 describe('TransferInstruction_Accept on a utility TransferOffer', () => {
-    it('is described by the schema example descriptor', () => {
-        const result = clearSign(utilityTransferAccept, [
+    it('is described by the schema example descriptor', async () => {
+        const result = await described(utilityTransferAccept, [
             parseDescriptor(transferOffer),
         ])
 
@@ -37,10 +36,10 @@ describe('TransferInstruction_Accept on a utility TransferOffer', () => {
             ['Instrument', 'Tebirkes'],
             ['From', SENDER],
             ['To', RECEIVER],
-            ['Transfer rule', `{"AV_ContractId":"${TRANSFER_RULE}"}`],
+            ['Transfer rule', TRANSFER_RULE],
         ])
         expect(intentText(op)).toBe(
-            `Accept 0.0000000421 Tebirkes from ${SENDER} to ${RECEIVER}, settled according to the transfer rule {"AV_ContractId":"${TRANSFER_RULE}"}`
+            `Accept 0.0000000421 Tebirkes from ${SENDER} to ${RECEIVER}, settled according to the transfer rule at ${TRANSFER_RULE}`
         )
     })
 })

@@ -8,8 +8,10 @@ import {
     handleErrorToast,
     toRelHref,
 } from '@canton-network/core-wallet-ui-components'
+import { HashingSchemeVersion } from '@canton-network/core-ledger-proto'
 import {
     hashForReview,
+    hashPreparedTransaction,
     type ParsedTransactionInfo,
     parsePreparedTransaction,
 } from '@canton-network/core-tx-visualizer'
@@ -129,8 +131,8 @@ export class ApproveUi extends BaseElement {
         this.origin = result.origin || null
         this.externalTxId = result.externalTxId || null
         this.failureReason = result.failureReason || null
-        this.describeTransaction()
         await this.reviewHash(result.preparedTransactionHash)
+        await this.describeTransaction()
 
         const wallets = await userClient.request({
             method: 'listWallets',
@@ -359,10 +361,17 @@ export class ApproveUi extends BaseElement {
         this.disabled = true
         this.tx = tx
         this.txHash = hash
-        this.describeTransaction()
         if (hash) {
             await this.reviewHash(hash)
+        } else {
+            // A preview carries no hash to check. The V3 hash only lets the page describe the
+            // bytes; nothing is verified against a hash the user was asked to approve.
+            this.reviewedHash = await hashPreparedTransaction(tx, 'base64', {
+                hashingScheme: HashingSchemeVersion.V3,
+                readUnknownField: 'throw',
+            })
         }
+        await this.describeTransaction()
     }
 
     // The hash the gateway reports only selects the hashing scheme; what is shown and approved is the
@@ -379,7 +388,7 @@ export class ApproveUi extends BaseElement {
         this.txHash = this.reviewedHash ?? claimedHash
     }
 
-    private describeTransaction() {
+    private async describeTransaction() {
         try {
             this.txParsed = parsePreparedTransaction(this.tx)
         } catch (error) {
@@ -387,9 +396,17 @@ export class ApproveUi extends BaseElement {
             this.txParsed = null
         }
 
+        if (!this.reviewedHash) {
+            this.clearSigning = null
+            return
+        }
         try {
             const descriptors = activeDescriptors().map((a) => a.descriptor)
-            this.clearSigning = clearSign(this.tx, descriptors)
+            this.clearSigning = await clearSign(
+                this.tx,
+                descriptors,
+                this.reviewedHash
+            )
             this.clearSigningError = null
         } catch (error) {
             // A malformed transaction: the detail view shows why, and approval stays the user's call.

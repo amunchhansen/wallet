@@ -215,6 +215,9 @@ export interface Simulation {
 
 /** A prepared transaction with one exercise root on the root contract of `contract`. */
 export function simulate(s: Simulation): string {
+    const source = decodePreparedTransaction(
+        captured(s.contract).preparedTransaction
+    )
     const create = rootCreate(s.contract)
     const { templateId } = create
     if (!templateId)
@@ -224,6 +227,7 @@ export function simulate(s: Simulation): string {
             transaction: {
                 version: '2.1',
                 roots: ['0'],
+                nodeSeeds: [{ nodeId: 0, seed: new Uint8Array(32) }],
                 nodes: [
                     {
                         nodeId: '0',
@@ -254,7 +258,13 @@ export function simulate(s: Simulation): string {
                 ],
             },
             metadata: {
-                inputContracts: [{ contract: { oneofKind: 'v1', v1: create } }],
+                ...source.metadata,
+                inputContracts: [
+                    {
+                        contract: { oneofKind: 'v1', v1: create },
+                        createdAt: 0n,
+                    },
+                ],
             },
         })
     )
