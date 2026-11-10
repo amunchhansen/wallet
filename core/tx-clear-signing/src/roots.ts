@@ -73,41 +73,32 @@ export function rootNodes(tx: PreparedTransaction): RootNode[] {
                 return { nodeId, kind: 'create', create: nodeType.create }
             case 'exercise':
                 return { nodeId, kind: 'exercise', exercise: nodeType.exercise }
+            case 'fetch':
+                return {
+                    nodeId,
+                    kind: 'other',
+                    nodeType: 'fetch',
+                    template: templateRef(nodeType.fetch.templateId, nodeId),
+                }
+            // queryByKey carries a template too; rollback does not.
+            case 'queryByKey':
+                return {
+                    nodeId,
+                    kind: 'other',
+                    nodeType: 'queryByKey',
+                    template: templateRef(
+                        nodeType.queryByKey.templateId,
+                        nodeId
+                    ),
+                }
             default:
-                return otherRoot(nodeId, nodeType)
+                return {
+                    nodeId,
+                    kind: 'other',
+                    nodeType: nodeType.oneofKind ?? 'empty',
+                }
         }
     })
-}
-
-function otherRoot(nodeId: string, nodeType: object): RootNode {
-    const nodeTypeName =
-        'oneofKind' in nodeType && typeof nodeType.oneofKind === 'string'
-            ? nodeType.oneofKind
-            : 'empty'
-    const body = (nodeType as Record<string, unknown>)[nodeTypeName]
-    const templateId =
-        body &&
-        typeof body === 'object' &&
-        'templateId' in body &&
-        isIdentifier(body.templateId)
-            ? body.templateId
-            : undefined
-    return {
-        nodeId,
-        kind: 'other',
-        nodeType: nodeTypeName,
-        ...(templateId && { template: templateRef(templateId, nodeId) }),
-    }
-}
-
-function isIdentifier(value: unknown): value is Identifier {
-    return (
-        typeof value === 'object' &&
-        value !== null &&
-        'packageId' in value &&
-        'moduleName' in value &&
-        'entityName' in value
-    )
 }
 
 export function templateRef(
@@ -160,7 +151,6 @@ export function contractsOf(tx: PreparedTransaction): ContractSet {
     return { byId, duplicateIds }
 }
 
-/**
 /** The create argument of an exercised contract, or why that contract cannot be read. */
 export type ContractArgument =
     | { argument: Value | undefined }

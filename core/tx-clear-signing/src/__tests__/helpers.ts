@@ -1,7 +1,15 @@
 // Copyright (c) 2025-2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { HashingSchemeVersion } from '@canton-network/core-ledger-proto'
+import {
+    HashingSchemeVersion,
+    PreparedTransaction,
+    type Create,
+    type Exercise,
+    type Fetch,
+    type Identifier,
+    type Rollback,
+} from '@canton-network/core-ledger-proto'
 import { hashPreparedTransaction } from '@canton-network/core-tx-visualizer'
 import {
     clearSign,
@@ -41,6 +49,37 @@ export function vectorDescriptor(
         },
         display,
     })
+}
+
+/** A prepared transaction as the base64 the parser takes. */
+export function encode(tx: PreparedTransaction): string {
+    const bytes = PreparedTransaction.toBinary(tx)
+    let binary = ''
+    for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]!)
+    }
+    return btoa(binary)
+}
+
+// Named here because the ledger proto does not export `Node`, and its node-type union names
+// `QueryByKey`, which is not exported either.
+type V1NodeType =
+    | { oneofKind: 'create'; create: Create }
+    | { oneofKind: 'fetch'; fetch: Fetch }
+    | { oneofKind: 'exercise'; exercise: Exercise }
+    | { oneofKind: 'rollback'; rollback: Rollback }
+    | { oneofKind: 'queryByKey'; queryByKey: { templateId?: Identifier } }
+    | { oneofKind: undefined }
+
+/** The v1 node type of a transaction's first root. */
+export function rootNodeType(tx: PreparedTransaction): V1NodeType {
+    const rootId = tx.transaction?.roots[0]
+    const node = tx.transaction?.nodes.find((n) => n.nodeId === rootId)
+    const versioned = node?.versionedNode
+    if (versioned?.oneofKind !== 'v1') {
+        throw new Error('root node has no v1 node')
+    }
+    return versioned.v1.nodeType
 }
 
 /** A hash of the transaction under the first scheme that can hash it, V3 then V2. */

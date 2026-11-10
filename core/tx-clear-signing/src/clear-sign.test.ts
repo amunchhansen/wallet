@@ -16,8 +16,10 @@ import {
 import { parseDescriptor } from './descriptor.js'
 import {
     described,
+    encode,
     hashEither,
     intentText,
+    rootNodeType,
     OTHER,
     OWNER,
     VECTOR_PACKAGE,
@@ -45,15 +47,6 @@ const PING_DESCRIPTOR = {
     version: '1.2.0',
 }
 
-function encode(tx: PreparedTransaction): string {
-    const bytes = PreparedTransaction.toBinary(tx)
-    let binary = ''
-    for (let i = 0; i < bytes.length; i++) {
-        binary += String.fromCharCode(bytes[i]!)
-    }
-    return btoa(binary)
-}
-
 const NO_ARGUMENT: Value = {
     sum: { oneofKind: 'record', record: { fields: [] } },
 }
@@ -64,9 +57,8 @@ function exercisePing(
     chosenValue = NO_ARGUMENT
 ): PreparedTransaction {
     const created = decodePreparedTransaction(builtinPingCreate)
-    const node = created.transaction?.nodes[0]?.versionedNode
-    const nodeType = node?.oneofKind === 'v1' ? node.v1.nodeType : undefined
-    if (nodeType?.oneofKind !== 'create') {
+    const nodeType = rootNodeType(created)
+    if (nodeType.oneofKind !== 'create') {
         throw new Error('fixture is not a create')
     }
     const create = nodeType.create

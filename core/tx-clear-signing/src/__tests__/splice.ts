@@ -1,10 +1,10 @@
 // Copyright (c) 2025-2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-// Fixtures and simulations for splice-contracts.test.ts. Captured fixtures come from
-// scripts/capture-splice.ts. A simulated transaction is built here: one exercise root on a contract
-// whose create node is taken from a captured fixture, so the input contract is real and only the
-// choice argument is hand-built.
+// Fixtures and simulations for splice-contracts.test.ts. Captured fixtures are prepared transactions
+// from a local Canton. A simulated transaction is built here: one exercise root on a contract whose
+// create node is taken from a captured fixture, so the input contract is real and only the choice
+// argument is hand-built.
 
 import {
     Exercise,
@@ -14,7 +14,13 @@ import {
 } from '@canton-network/core-ledger-proto'
 import { decodePreparedTransaction } from '@canton-network/core-tx-visualizer'
 import { type Descriptor, parseDescriptor } from '../descriptor.js'
+import externalPartyAmuletRules from '../descriptors/external-party-amulet-rules.json'
+import { encode, rootNodeType } from './helpers.js'
 import { allocationV2Multileg } from './fixtures/allocation-v2-multileg.js'
+
+/** splice-amulet 0.1.25, the package the captured fixtures were prepared on. */
+const LOCALNET_AMULET =
+    'c5203dee918350373a993328e345872113bd5f8c8f0f51967014d813e583ae66'
 
 interface Fixture {
     id: string
@@ -32,9 +38,7 @@ const descriptorFiles = import.meta.glob('./schema-examples/splice/*.json', {
     import: 'default',
 })
 
-export const capturedIds = Object.values(fixtureFiles)
-    .map((f) => f.id)
-    .filter((id) => id !== undefined)
+export const capturedIds = Object.values(fixtureFiles).map((f) => f.id)
 
 export function captured(id: string): Fixture {
     const fixture = fixtureFiles[`./fixtures/splice/${id}.json`]
@@ -42,11 +46,22 @@ export function captured(id: string): Fixture {
     return fixture
 }
 
-export const spliceDescriptors: Descriptor[] = Object.values(
-    descriptorFiles
-).map((json) => parseDescriptor(json))
+// The shipped amulet-rules descriptor, bound to the package the fixtures were prepared on.
+const shippedAmulet = parseDescriptor(externalPartyAmuletRules)
+export const spliceDescriptors: Descriptor[] = [
+    ...Object.values(descriptorFiles).map((json) => parseDescriptor(json)),
+    {
+        ...shippedAmulet,
+        context: {
+            template: {
+                ...shippedAmulet.context.template,
+                packageId: LOCALNET_AMULET,
+            },
+        },
+    },
+]
 
-// The parties allocated by the capture script.
+// The parties the fixtures were prepared with.
 const PARTICIPANT =
     '1220d44fc1c3ba0b5bdf7b956ee71bc94ebe2d23258dc268fdf0824fbaeff2c61424'
 export const DSO = `csdso::${PARTICIPANT}`
@@ -180,25 +195,12 @@ export const INTERFACES = {
 
 // Simulation ----------------------------------------------------------------------------------
 
-export function encode(tx: PreparedTransaction): string {
-    const bytes = PreparedTransaction.toBinary(tx)
-    let binary = ''
-    for (let i = 0; i < bytes.length; i++) {
-        binary += String.fromCharCode(bytes[i]!)
-    }
-    return btoa(binary)
-}
-
 function rootCreate(fixtureId: string) {
     const tx = decodePreparedTransaction(
         captured(fixtureId).preparedTransaction
     )
-    const rootId = tx.transaction?.roots[0]
-    const node = tx.transaction?.nodes.find((n) => n.nodeId === rootId)
-    const versioned = node?.versionedNode
-    const nodeType =
-        versioned?.oneofKind === 'v1' ? versioned.v1.nodeType : undefined
-    if (nodeType?.oneofKind !== 'create') {
+    const nodeType = rootNodeType(tx)
+    if (nodeType.oneofKind !== 'create') {
         throw new Error(`fixture '${fixtureId}' has no create root`)
     }
     return nodeType.create
@@ -275,12 +277,9 @@ export function capturedAllocationV2(): {
     value: Value
     interfaceId: Identifier
 } {
-    const tx = decodePreparedTransaction(allocationV2Multileg)
-    const rootId = tx.transaction?.roots[0]
-    const node = tx.transaction?.nodes.find((n) => n.nodeId === rootId)
-    const versioned = node?.versionedNode
-    const nodeType =
-        versioned?.oneofKind === 'v1' ? versioned.v1.nodeType : undefined
+    const nodeType = rootNodeType(
+        decodePreparedTransaction(allocationV2Multileg)
+    )
     if (
         nodeType?.oneofKind !== 'exercise' ||
         !nodeType.exercise.chosenValue ||
