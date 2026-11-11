@@ -12,7 +12,7 @@ import {
     PreparedTransaction,
     type Value,
 } from '@canton-network/core-ledger-proto'
-import { decodePreparedTransaction } from '@canton-network/core-tx-visualizer'
+import { decode } from '../roots.js'
 import { type Descriptor, parseDescriptor } from '../descriptor.js'
 import externalPartyAmuletRules from '../descriptors/external-party-amulet-rules.json'
 import { encode, rootNodeType } from './helpers.js'
@@ -196,9 +196,7 @@ export const INTERFACES = {
 // Simulation ----------------------------------------------------------------------------------
 
 function rootCreate(fixtureId: string) {
-    const tx = decodePreparedTransaction(
-        captured(fixtureId).preparedTransaction
-    )
+    const tx = decode(captured(fixtureId).preparedTransaction)
     const nodeType = rootNodeType(tx)
     if (nodeType.oneofKind !== 'create') {
         throw new Error(`fixture '${fixtureId}' has no create root`)
@@ -217,9 +215,7 @@ export interface Simulation {
 
 /** A prepared transaction with one exercise root on the root contract of `contract`. */
 export function simulate(s: Simulation): string {
-    const source = decodePreparedTransaction(
-        captured(s.contract).preparedTransaction
-    )
+    const source = decode(captured(s.contract).preparedTransaction)
     const create = rootCreate(s.contract)
     const { templateId } = create
     if (!templateId)
@@ -277,9 +273,7 @@ export function capturedAllocationV2(): {
     value: Value
     interfaceId: Identifier
 } {
-    const nodeType = rootNodeType(
-        decodePreparedTransaction(allocationV2Multileg)
-    )
+    const nodeType = rootNodeType(decode(allocationV2Multileg))
     if (
         nodeType?.oneofKind !== 'exercise' ||
         !nodeType.exercise.chosenValue ||

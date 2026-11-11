@@ -10,7 +10,8 @@ import {
     type Identifier,
     type Rollback,
 } from '@canton-network/core-ledger-proto'
-import { hashPreparedTransaction } from '@canton-network/core-tx-visualizer'
+import { computePreparedTransactionHash } from '@canton-network/core-tx-hashing'
+import { toBase64 } from '../bytes.js'
 import {
     clearSign,
     type ClearSigningResult,
@@ -88,10 +89,9 @@ export async function hashEither(tx: string): Promise<string> {
     const schemes = [HashingSchemeVersion.V3, HashingSchemeVersion.V2] as const
     for (const hashingScheme of schemes) {
         try {
-            return await hashPreparedTransaction(tx, 'base64', {
-                hashingScheme,
-                readUnknownField: 'throw',
-            })
+            return toBase64(
+                await computePreparedTransactionHash(tx, hashingScheme)
+            )
         } catch (err) {
             last = err
         }

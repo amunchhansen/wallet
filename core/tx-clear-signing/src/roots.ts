@@ -1,14 +1,14 @@
 // Copyright (c) 2025-2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import type {
-    Create,
-    Exercise,
-    Identifier,
+import {
     PreparedTransaction,
-    Value,
+    type Create,
+    type Exercise,
+    type Identifier,
+    type Value,
 } from '@canton-network/core-ledger-proto'
-import { decodePreparedTransaction } from '@canton-network/core-tx-visualizer'
+import { fromBase64 } from './bytes.js'
 
 /** The identity of a Daml template, which a descriptor binds to exactly. */
 export interface TemplateRef {
@@ -44,7 +44,9 @@ export class TransactionShapeError extends Error {
 
 // Unknown fields could carry content the user is never shown, so decoding refuses them.
 export function decode(tx: string): PreparedTransaction {
-    return decodePreparedTransaction(tx, { readUnknownField: 'throw' })
+    return PreparedTransaction.fromBinary(fromBase64(tx), {
+        readUnknownField: 'throw',
+    })
 }
 
 /**

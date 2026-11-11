@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Value } from '@canton-network/core-ledger-proto'
-import { hashForReview } from '@canton-network/core-tx-visualizer'
+import { hashForReview } from './hash.js'
 import type {
     Descriptor,
     Exercise,
@@ -30,6 +30,7 @@ import {
     type RootNode,
     type TemplateRef,
 } from './roots.js'
+import { indexByTemplate } from './select.js'
 
 export interface DescribedField {
     label: string
@@ -187,20 +188,6 @@ export function describeUnverified(
 
 function resolved(field: DescribedField): boolean {
     return field.error === undefined
-}
-
-function indexByTemplate(
-    descriptors: readonly Descriptor[]
-): Map<string, Descriptor> {
-    const byTemplate = new Map<string, Descriptor>()
-    for (const d of descriptors) {
-        const key = templateKey(d.context.template)
-        if (byTemplate.has(key)) {
-            throw new Error(`more than one descriptor for template '${key}'`)
-        }
-        byTemplate.set(key, d)
-    }
-    return byTemplate
 }
 
 function describeNode(

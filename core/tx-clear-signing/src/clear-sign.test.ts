@@ -7,7 +7,7 @@ import {
     PreparedTransaction,
     type Value,
 } from '@canton-network/core-ledger-proto'
-import { decodePreparedTransaction } from '@canton-network/core-tx-visualizer'
+import { decode } from './roots.js'
 import {
     HashMismatchError,
     clearSign,
@@ -56,7 +56,7 @@ function exercisePing(
     choiceId = 'Respond',
     chosenValue = NO_ARGUMENT
 ): PreparedTransaction {
-    const created = decodePreparedTransaction(builtinPingCreate)
+    const created = decode(builtinPingCreate)
     const nodeType = rootNodeType(created)
     if (nodeType.oneofKind !== 'create') {
         throw new Error('fixture is not a create')
@@ -108,10 +108,16 @@ function exercisePing(
 
 describe('clearSign', () => {
     it('rejects a transaction without a transaction tree', async () => {
-        // Hashing rejects bytes that are not a prepared transaction before they are described.
-        await expect(
-            described(encode(PreparedTransaction.create()), [])
-        ).rejects.toThrow(/input is empty/)
+        // Hashing rejects it before it is described. An empty message is not canonical base64,
+        // so the fixture carries a field and omits the transaction.
+        const tx = encode(
+            PreparedTransaction.create({
+                metadata: { synchronizerId: 'sync::participant' },
+            })
+        )
+        await expect(described(tx, [])).rejects.toThrow(
+            'prepared transaction has no transaction'
+        )
     })
 
     it('describes a Ping create', async () => {

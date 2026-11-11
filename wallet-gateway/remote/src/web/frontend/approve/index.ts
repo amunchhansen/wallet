@@ -9,13 +9,14 @@ import {
     toRelHref,
 } from '@canton-network/core-wallet-ui-components'
 import {
-    hashForReview,
     type ParsedTransactionInfo,
     parsePreparedTransaction,
 } from '@canton-network/core-tx-visualizer'
 import {
     clearSign,
     describeUnverified,
+    hashForReview,
+    selectDescriptors,
     type Descriptor,
     type TransactionDescription,
 } from '@canton-network/core-tx-clear-signing'
@@ -416,7 +417,8 @@ export class ApproveUi extends BaseElement {
         ) => TransactionDescription | Promise<TransactionDescription>
     ) {
         try {
-            const descriptors = activeDescriptors().map((a) => a.descriptor)
+            const candidates = activeDescriptors().map((a) => a.descriptor)
+            const descriptors = selectDescriptors(this.tx, candidates)
             this.clearSigning = await describe(descriptors)
             this.clearSigningError = null
         } catch (error) {

@@ -8,7 +8,8 @@
 
 import { describe, expect, it } from 'vitest'
 import { HashingSchemeVersion } from '@canton-network/core-ledger-proto'
-import { hashPreparedTransaction } from '@canton-network/core-tx-visualizer'
+import { computePreparedTransactionHash } from '@canton-network/core-tx-hashing'
+import { toBase64 } from './bytes.js'
 import type { OperationDescription } from './clear-sign.js'
 import { described, intentText } from './__tests__/helpers.js'
 import {
@@ -63,10 +64,11 @@ describe('captured fixtures', () => {
                 fixture.hashingSchemeVersion === 'HASHING_SCHEME_VERSION_V3'
                     ? HashingSchemeVersion.V3
                     : HashingSchemeVersion.V2
-            const hash = await hashPreparedTransaction(
-                fixture.preparedTransaction,
-                'base64',
-                { hashingScheme: scheme, readUnknownField: 'throw' }
+            const hash = toBase64(
+                await computePreparedTransactionHash(
+                    fixture.preparedTransaction,
+                    scheme
+                )
             )
             expect(hash).toBe(fixture.preparedTransactionHash)
         }
