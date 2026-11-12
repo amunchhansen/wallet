@@ -13,8 +13,11 @@ import { parseDescriptor, type Descriptor } from './descriptor.js'
 let cached: readonly Descriptor[] | undefined
 
 /**
- * The clear-signing descriptors shipped with this build. A prepared transaction is fully described
- * only when every root matches one of these, by package ID, module and entity.
+ * The descriptors bundled with this build. A caller passes them to `clearSign`, together with any
+ * descriptors of its own. A prepared transaction is fully described when every root matches one, by
+ * package ID, module and entity.
+ *
+ * The wallet gateway descriptor store merges uploaded descriptors over this set.
  */
 export function shippedDescriptors(): readonly Descriptor[] {
     cached ??= Object.freeze([

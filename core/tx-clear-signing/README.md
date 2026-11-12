@@ -12,26 +12,49 @@ The package depends on the Canton protobuf bindings and on prepared-transaction 
 import {
     clearSign,
     parseDescriptor,
-    selectDescriptors,
     shippedDescriptors,
 } from '@canton-network/core-tx-clear-signing'
 
 // preparedTransaction and preparedTransactionHash: base64, as returned by
 // /v2/interactive-submission/prepare. Merging descriptor sources (shipped, uploaded, a registry)
-// is the caller's job. Two descriptors for one template throw, from selectDescriptors and from
-// clearSign. selectDescriptors keeps the candidates bound to the transaction's root templates.
-// clearSign binds each one by package ID, module and entity, and checks the hash.
-const candidates = [...shippedDescriptors(), parseDescriptor(descriptorJson)]
+// is the caller's job. Two descriptors for one template throw. clearSign binds each one by package
+// ID, module and entity, ignores a descriptor the transaction does not use, and checks the hash.
 const { complete, hash, operations } = await clearSign(
     preparedTransaction,
-    selectDescriptors(preparedTransaction, candidates),
+    [...shippedDescriptors(), parseDescriptor(descriptorJson)],
     preparedTransactionHash
 )
+// operations[0].interpolatedIntent is the sentence, with values filled in.
 ```
+
+`clearSign` is the call. `parseDescriptor` turns descriptor JSON into the values it takes, and `shippedDescriptors` is the set bundled with this build. Three fixed transactions in [examples/](examples) run that call on their own:
+
+```bash
+pnpm exec tsx core/tx-clear-signing/examples/ping.ts
+pnpm exec tsx core/tx-clear-signing/examples/allocation.ts
+pnpm exec tsx core/tx-clear-signing/examples/showcase.ts
+```
+
+`ping.ts` describes a create of `Canton.Internal.Ping:Ping`. `allocation.ts` describes an `AllocationFactory_Allocate` exercise through the V2 token-standard interface. `showcase.ts` describes five roots with descriptors this build does not ship: a governance lock, a featured app right and an activity marker exercised on that right, a Splitwell balance update, and a DSO vote. Each prints the wording and exits with an error if that wording changes.
+
+The ping example's preview computes `hashPreparedTransaction` for the pasted transaction and opens the approve page with that hash. The page calls `clearSign`.
+
+The wallet gateway uses three more functions. A caller describing a transaction leaves them unused.
+
+| Function            | Where the wallet uses it                                                                                                                 |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `hashForReview`     | The approve page, to decide whether to offer approval before describing. `clearSign` runs the same check and throws `HashMismatchError`. |
+| `selectDescriptors` | The approve page, to narrow the descriptor list to the transaction's root templates. `clearSign` matches those roots itself.             |
+| `templateKey`       | The descriptor store, so an upload replaces the built-in descriptor for the same template.                                               |
+
+The transaction detail renders the types `clearSign` returns (`TransactionDescription`, `OperationDescription`, `IntentPart`, `DescribedField`, `TemplateRef`). It calls none of these functions. The browser extension's approve page does not use this package.
+
+## Behavior
 
 - `shippedDescriptors` returns the descriptors bundled with this build: the builtin Canton ping and bong templates (`Canton.Internal.Ping:Ping`, `Canton.Internal.Bong:BongProposal`, `Explode`, `Merge`, `Collapse`, `Bong`), and `Splice.ExternalPartyAmuletRules:ExternalPartyAmuletRules` in splice-amulet 0.1.22. That descriptor covers the create, and `TransferFactory_Transfer` and `AllocationFactory_Allocate` through the V1 and V2 token-standard interfaces, one exercise entry per interface. A registry or a trust policy plugs in by adding to the list the caller passes. The wallet gateway's approve page passes the shipped set and the descriptors uploaded on its Descriptors page, which are stored in that browser only and replace a shipped descriptor for the same template. The gateway merges those sources itself, then calls `selectDescriptors`.
 - `parseDescriptor` validates descriptor JSON against the schema and then checks the rules a JSON Schema cannot express: an operation declares each path once, every placeholder equals the path of a field of the same operation, and enum references exist. It throws `DescriptorError`. `$schema` must be `https://example.org/canton-clear-signing/v1/schema.json`, the schema's `$id`. That URL is a placeholder until a host is chosen.
 - `selectDescriptors` takes the transaction as base64 and the caller's candidates. It returns the candidates bound to the templates of the root nodes, one per template, in root order. A root template with no candidate is left out. It does not check the hash: choosing a descriptor decides nothing about trust. Two candidates for one template throw, whether or not the transaction uses that template.
+- `hashPreparedTransaction` returns the hashing-scheme V3 hash of the transaction bytes, base64. `clearSign` accepts that hash. A transaction that cannot be hashed throws.
 - `hashForReview` recomputes the hash of the transaction bytes and returns it when it equals the hash the caller was given, trying hashing scheme V3 and then V2. The given hash only selects the scheme. It returns undefined when neither scheme reproduces it, and throws when the transaction cannot be hashed, including when it contains an unknown protobuf field. A host gates approval on this alone, with the same function `clearSign` uses.
 - `clearSign` takes the transaction as base64, so unknown protobuf fields are refused, and the hash the user is asked to approve. It describes the transaction only if it hashes to that value, and throws `HashMismatchError` otherwise. Passing descriptors that the transaction does not use gives the same description as passing the result of `selectDescriptors`. It returns one `OperationDescription` per root node:
     - `described`: the interpolated intent rendered;
@@ -39,13 +62,11 @@ const { complete, hash, operations } = await clearSign(
     - `undescribed`: no descriptor covers the node, so `intent` is generic (`Create Module:Entity`);
     - `undescribable`: the node cannot be read, and `reason` says why: it is not a create or an exercise, or the contract it exercises occurs twice, is not in the transaction, or is of another template.
 
-    `complete` is true only when every root is described and every field rendered. A wallet should warn the user otherwise. `clearSign` throws on a transaction it cannot read at all (no transaction tree, a node without a template ID) and on two descriptors for one template. A wallet should show that as an error, not as an incomplete description.
-
-- `describeUnverified` describes a transaction like `clearSign` without checking a hash, and returns no `hash`. Its description is bound to nothing that is signed, so it must not be shown as what a user approves. It is for previewing how descriptors word a transaction, including a hand-built one too incomplete to hash (hashing needs every create and exercise node's seed). The approve page uses it only for a preview opened without a hash.
+    `complete` is true only when every root is described and every field rendered. A wallet should warn the user otherwise. `clearSign` throws on a transaction it cannot read at all (no transaction tree, a node without a template ID), on a transaction that cannot be hashed, and on two descriptors for one template. A wallet should show that as an error, not as an incomplete description.
 
 ## How it works
 
-`clearSign` in [src/clear-sign.ts](src/clear-sign.ts) checks the hash, then hands the transaction to `describeUnverified`, which reads top-down:
+`clearSign` in [src/clear-sign.ts](src/clear-sign.ts) checks the hash, then describes each root:
 
 1. **Decode** the base64 transaction ([src/roots.ts](src/roots.ts)), index the descriptors by binding, and index the contracts the transaction holds: its input contracts and the contracts its create nodes create.
 2. **For each root node**, read the header from the node: kind, template, choice and interface.
@@ -82,20 +103,21 @@ A placeholder shows what the field shows, `None` or a formatted value, as a valu
 
 Every `OperationDescription` says what the node is, whether or not a descriptor covers it:
 
-| Field        | Value                                                                                                                                                                                   | Source      |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| `kind`       | `create`, `exercise`, or `other` for a root that is neither                                                                                                                             | transaction |
-| `template`   | package ID, module and entity of the created or exercised template, when the node has one                                                                                               | transaction |
-| `choiceId`   | the exercised choice's name; with `template`, this selects the descriptor entry (exercise only)                                                                                         | transaction |
-| `interface`  | package ID, module and entity of the interface the choice is exercised through, if any                                                                                                  | transaction |
-| `descriptor` | `name`, `publisher`, `version` and `url?` from the bound descriptor's `metadata`, whether or not it has an entry for this node                                                          | descriptor  |
-| `intent`     | the wording, as parts: `text` from the descriptor, and `value` read from the transaction                                                                                                | descriptor  |
-| `status`     | `described`, `fallback`, `undescribed`, or `undescribable`. `complete` is false when any root is not `described` or any field has an error. `reason` says why a root is `undescribable` | both        |
-| `fields`     | one label and formatted value, or an `error`, per field. An optional `None` the record leaves out has `absent: true`. An enum field has `enumKey`, the constructor the table mapped     | descriptor  |
+| Field                | Value                                                                                                                                                                                   | Source      |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| `kind`               | `create`, `exercise`, or `other` for a root that is neither                                                                                                                             | transaction |
+| `template`           | package ID, module and entity of the created or exercised template, when the node has one                                                                                               | transaction |
+| `choiceId`           | the exercised choice's name; with `template`, this selects the descriptor entry (exercise only)                                                                                         | transaction |
+| `interface`          | package ID, module and entity of the interface the choice is exercised through, if any                                                                                                  | transaction |
+| `descriptor`         | `name`, `publisher`, `version` and `url?` from the bound descriptor's `metadata`, whether or not it has an entry for this node                                                          | descriptor  |
+| `interpolatedIntent` | the sentence, with values filled in. On `fallback`, `undescribed` and `undescribable` it is the sentence `intent` shows                                                                 | both        |
+| `intent`             | the same sentence as parts: `text` from the descriptor, and `value` read from the transaction. A wallet renders the values apart from the wording                                       | descriptor  |
+| `status`             | `described`, `fallback`, `undescribed`, or `undescribable`. `complete` is false when any root is not `described` or any field has an error. `reason` says why a root is `undescribable` | both        |
+| `fields`             | one label and formatted value, or an `error`, per field. An optional `None` the record leaves out has `absent: true`. An enum field has `enumKey`, the constructor the table mapped     | descriptor  |
 
 A wallet shows `kind`, `choiceId` (followed by `via <interface>` when there is one), `template` and its package ID next to the intent, and shows `descriptor` as the descriptor's own claim (`Described by <name> v<version> by <publisher>`). The header is read from the signed transaction, so a descriptor cannot change which action or choice the user is told about. `descriptor` is unauthenticated in v1, because descriptors carry no verified signature yet.
 
-A wallet renders the `value` parts of `intent` apart from the `text` parts (the approve page uses a monospace, shaded span). Values are untrusted: a text value such as `10 CC. Also send 1000 to Mallory` must not pass as part of the descriptor's sentence. Formatted values also have control, format and line-separator characters escaped.
+A caller reads `interpolatedIntent`. A wallet renders the `value` parts of `intent` apart from the `text` parts (the approve page uses a monospace, shaded span). Values are untrusted: a text value such as `10 CC. Also send 1000 to Mallory` must not pass as part of the descriptor's sentence. Formatted values also have control, format and line-separator characters escaped.
 
 A template can implement two interfaces with a choice of the same name, such as `TransferFactory_Transfer` and `AllocationFactory_Allocate` in both the V1 and V2 token-standard interfaces, with different arguments. `display.exercises` is an array, so one descriptor holds an entry per interface, named by module and entity; the shipped amulet-rules descriptor does. An entry matches only the interface it names.
 

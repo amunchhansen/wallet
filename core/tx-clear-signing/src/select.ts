@@ -38,6 +38,9 @@ export function indexByTemplate(
  * Selection does not check the hash and decides nothing about trust. `clearSign` still binds every
  * root to its descriptor by exact package ID, module and entity, and checks the hash.
  *
+ * The wallet gateway approve page calls this to narrow its descriptor list. A caller can pass that
+ * list to `clearSign` directly: a descriptor the transaction does not use is ignored.
+ *
  * @throws Error when two candidates bind the same template
  * @throws TransactionShapeError when the transaction cannot be read
  */

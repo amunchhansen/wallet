@@ -100,10 +100,20 @@ export interface OperationDescription {
      * intent. `complete` is false when any root is not `described` or any field has an error.
      */
     status: 'described' | 'fallback' | 'undescribed' | 'undescribable'
+    /**
+     * The sentence, with values filled in. On `fallback`, `undescribed` and `undescribable` it is the
+     * sentence `intent` shows: the descriptor's stable intent, or a generic one. `intent` keeps each
+     * value apart from the wording, so a wallet can render a value separately from the sentence.
+     */
+    interpolatedIntent: string
     intent: IntentPart[]
     fields: DescribedField[]
 }
 
+/**
+ * The description of a prepared transaction, one entry per root. `clearSign` returns this plus the
+ * hash. The wallet's transaction detail renders `operations`.
+ */
 export interface TransactionDescription {
     /** True when every root is described and every field rendered. */
     complete: boolean
@@ -138,8 +148,13 @@ interface Selected {
 }
 
 /**
- * Describes each root node of a prepared transaction with the descriptor bound to it. Child nodes
- * are consequences of their root's choice, which the root's descriptor words.
+ * Describes each root node of a prepared transaction with the descriptor bound to it. This is the
+ * function a caller uses. Child nodes are consequences of their root's choice, which the root's
+ * descriptor words.
+ *
+ * The descriptors are the caller's trusted set, from `parseDescriptor` or `shippedDescriptors`, at
+ * most one per template. A descriptor the transaction does not use is ignored: `clearSign` matches
+ * each root by package ID, module and entity.
  *
  * The description is only as trustworthy as its binding to what is signed. `expectedHash` is the hash
  * the user is asked to approve; the transaction is described only when it hashes to that value.
@@ -149,7 +164,7 @@ interface Selected {
  * @param descriptors - descriptors already validated with `parseDescriptor`; at most one per template
  * @param expectedHash - the hash the transaction must have, as base64
  * @throws HashMismatchError when the transaction does not hash to `expectedHash`
- * @throws Error when two descriptors bind the same template, or the transaction is malformed
+ * @throws Error when the transaction cannot be hashed, two descriptors bind the same template, or the transaction is malformed
  */
 export async function clearSign(
     tx: string,
@@ -160,17 +175,11 @@ export async function clearSign(
     if (hash === undefined) {
         throw new HashMismatchError(expectedHash)
     }
-    return { ...describeUnverified(tx, descriptors), hash }
+    return { ...describeRoots(tx, descriptors), hash }
 }
 
-/**
- * Describes a prepared transaction like `clearSign`, without checking its hash. The description is
- * not bound to anything signed, so it must not be shown as what a user approves; it is for previewing
- * how descriptors word a transaction, including one too incomplete to hash.
- *
- * @throws Error when two descriptors bind the same template, or the transaction is malformed
- */
-export function describeUnverified(
+/** The description `clearSign` returns once the transaction hashes to `expectedHash`. */
+function describeRoots(
     tx: string,
     descriptors: readonly Descriptor[]
 ): TransactionDescription {
@@ -197,9 +206,11 @@ function describeNode(
 ): OperationDescription {
     const header = nodeHeader(node)
     if (node.kind === 'other') {
-        return undescribable(
-            header,
-            `root node '${node.nodeId}' is a '${node.nodeType}' node`
+        return withIntent(
+            undescribable(
+                header,
+                `root node '${node.nodeId}' is a '${node.nodeType}' node`
+            )
         )
     }
     const descriptor = header.template
@@ -208,21 +219,37 @@ function describeNode(
     const bound = descriptor && { descriptor: descriptorInfo(descriptor) }
     const selected = descriptor && selectOperation(node, descriptor, contracts)
     if (selected?.reason) {
-        return { ...undescribable(header, selected.reason), ...bound }
+        return withIntent({
+            ...undescribable(header, selected.reason),
+            ...bound,
+        })
     }
     if (!selected?.selected) {
-        return {
+        return withIntent({
             ...header,
             ...bound,
             status: 'undescribed',
             intent: [text(genericIntent(header))],
             fields: [],
-        }
+        })
     }
-    return { ...header, ...bound, ...describeOperation(selected.selected) }
+    return withIntent({
+        ...header,
+        ...bound,
+        ...describeOperation(selected.selected),
+    })
 }
 
-function undescribable(header: Header, reason: string): OperationDescription {
+type OperationBody = Omit<OperationDescription, 'interpolatedIntent'>
+
+function withIntent(operation: OperationBody): OperationDescription {
+    const interpolatedIntent = operation.intent
+        .map((part) => (part.kind === 'text' ? part.text : part.value))
+        .join('')
+    return { ...operation, interpolatedIntent }
+}
+
+function undescribable(header: Header, reason: string): OperationBody {
     return {
         ...header,
         status: 'undescribable',
@@ -351,7 +378,7 @@ function descriptorInfo({ metadata }: Descriptor): DescriptorInfo {
 
 function describeOperation(
     selected: Selected
-): Pick<OperationDescription, 'status' | 'intent' | 'fields'> {
+): Pick<OperationBody, 'status' | 'intent' | 'fields'> {
     const { op } = selected
     const enums = selected.descriptor.metadata.enums ?? {}
     const fields = (op.fields ?? []).map((f) =>

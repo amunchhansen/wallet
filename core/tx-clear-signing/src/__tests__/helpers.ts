@@ -109,7 +109,5 @@ export async function described(
 
 /** The intent as one string, for assertions on its wording. */
 export function intentText(op: OperationDescription | undefined): string {
-    return (op?.intent ?? [])
-        .map((part) => (part.kind === 'text' ? part.text : part.value))
-        .join('')
+    return op?.interpolatedIntent ?? ''
 }

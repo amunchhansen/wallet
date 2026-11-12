@@ -8,16 +8,11 @@ import {
     type Value,
 } from '@canton-network/core-ledger-proto'
 import { decode } from './roots.js'
-import {
-    HashMismatchError,
-    clearSign,
-    describeUnverified,
-} from './clear-sign.js'
+import { HashMismatchError, clearSign } from './clear-sign.js'
 import { parseDescriptor } from './descriptor.js'
 import {
     described,
     encode,
-    hashEither,
     intentText,
     rootNodeType,
     OTHER,
@@ -132,6 +127,7 @@ describe('clearSign', () => {
                     template: ping.context.template,
                     descriptor: PING_DESCRIPTOR,
                     status: 'described',
+                    interpolatedIntent: `Ping ${PING_ID} from ${ALICE} to ${ALICE}`,
                     // Values are kept apart from the descriptor's wording.
                     intent: [
                         { kind: 'text', text: 'Ping ' },
@@ -667,24 +663,14 @@ describe('clearSign', () => {
             clearSign(builtinPingCreate, [ping], 'bm90LWEgaGFzaA==')
         ).rejects.toThrow(HashMismatchError)
     })
-})
 
-describe('describeUnverified', () => {
-    it('describes a transaction that cannot be hashed', async () => {
+    it('rejects a transaction that cannot be hashed', async () => {
         const tx = exercisePing()
         tx.transaction!.nodeSeeds = []
         const unseeded = encode(tx)
-        await expect(hashEither(unseeded)).rejects.toThrow(/has no seed/)
-
-        const result = describeUnverified(unseeded, [ping])
-        expect(result).not.toHaveProperty('hash')
-        expect(result.operations[0]).toMatchObject({
-            kind: 'exercise',
-            status: 'described',
-        })
-        expect(intentText(result.operations[0])).toBe(
-            `Respond to ping ${PING_ID} from ${ALICE}`
-        )
+        await expect(
+            clearSign(unseeded, [ping], 'bm90LWEgaGFzaA==')
+        ).rejects.toThrow(/has no seed/)
     })
 })
 

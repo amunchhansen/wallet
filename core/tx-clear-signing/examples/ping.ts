@@ -1,0 +1,44 @@
+// Copyright (c) 2025-2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+// A fixed Ping create, clear-signed with the descriptors shipped in this build.
+//
+// From the wallet repository:
+//   pnpm exec tsx core/tx-clear-signing/examples/ping.ts
+
+import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { clearSign, shippedDescriptors } from '../src/index.js'
+import { builtinPingCreate } from '../src/__tests__/fixtures/ping.js'
+
+/** Base64 prepared transaction, as `/v2/interactive-submission/prepare` returns it. */
+export const preparedTransaction = builtinPingCreate
+
+/** The hash of `preparedTransaction`. `clearSign` describes it only when it hashes to this. */
+export const preparedTransactionHash =
+    'SY+x4x4DoOTcb5VbJN/jScYltMJeDzBhFpBYdmN97PY='
+
+export const intent =
+    'Ping 04d887dd-15b8-4954-8b79-a853811ce7cf from v1-01-alice::1220ee2624190834dddf28f194685acee8f00cbde9ee0d211dae277f4d799884f289 to v1-01-alice::1220ee2624190834dddf28f194685acee8f00cbde9ee0d211dae277f4d799884f289'
+
+export function describePing() {
+    return clearSign(
+        preparedTransaction,
+        shippedDescriptors(),
+        preparedTransactionHash
+    )
+}
+
+async function run(): Promise<void> {
+    const result = await describePing()
+    const wording = result.operations[0]?.interpolatedIntent
+    if (wording !== intent) {
+        throw new Error(`wording changed: ${wording}`)
+    }
+    console.log(wording)
+}
+
+const entry = process.argv[1]
+if (entry !== undefined && fileURLToPath(import.meta.url) === resolve(entry)) {
+    await run()
+}

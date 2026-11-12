@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { fromBase64, toBase64 } from './bytes.js'
-import { hashForReview } from './hash.js'
+import { hashForReview, hashPreparedTransaction } from './hash.js'
 import createAndExercise from './__tests__/fixtures/v2-create-and-exercise.json'
 import glLockCreate from './__tests__/fixtures/splice/gl-lock-create.json'
 
@@ -54,5 +54,17 @@ describe('hashForReview', () => {
             name: 'TxHashingError',
             code: 'UNKNOWN_FIELD',
         })
+    })
+})
+
+describe('hashPreparedTransaction', () => {
+    it('returns the V3 hash clearSign accepts', async () => {
+        await expect(
+            hashPreparedTransaction(glLockCreate.preparedTransaction)
+        ).resolves.toBe(glLockCreate.preparedTransactionHash)
+        const v2Transaction = createAndExercise.preparedTransaction
+        const v3Hash = await hashPreparedTransaction(v2Transaction)
+        expect(v3Hash).not.toBe(hexToBase64(createAndExercise.expected.hash))
+        await expect(hashForReview(v2Transaction, v3Hash)).resolves.toBe(v3Hash)
     })
 })

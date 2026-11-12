@@ -117,6 +117,11 @@ export function templateRef(
     }
 }
 
+/**
+ * `packageId:moduleName:entityName`, the key `clearSign` uses to bind a descriptor to a template.
+ * The wallet gateway descriptor store uses it so an upload replaces the built-in descriptor for the
+ * same template.
+ */
 export function templateKey(t: TemplateRef): string {
     return `${t.packageId}:${t.moduleName}:${t.entityName}`
 }

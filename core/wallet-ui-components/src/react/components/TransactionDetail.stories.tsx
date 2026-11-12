@@ -356,6 +356,7 @@ const clearSigning: TransactionDescription = {
                 version: '1.0.0',
             },
             status: 'described',
+            interpolatedIntent: 'Ping ping-1 from alice::1220aa to bob::1220bb',
             intent: [
                 { kind: 'text', text: 'Ping ' },
                 { kind: 'value', path: 'id', value: 'ping-1' },
@@ -385,6 +386,7 @@ const clearSigning: TransactionDescription = {
             template: pingTemplate,
             choiceId: 'Archive',
             status: 'undescribed',
+            interpolatedIntent: 'Exercise Archive on Canton.Internal.Ping:Ping',
             intent: [
                 {
                     kind: 'text',
@@ -410,6 +412,7 @@ const clearSigning: TransactionDescription = {
                 version: '1.0.0',
             },
             status: 'described',
+            interpolatedIntent: 'Allocate funds for a settlement',
             intent: [{ kind: 'text', text: 'Allocate funds for a settlement' }],
             fields: [],
         },
