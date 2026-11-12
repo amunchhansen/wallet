@@ -37,15 +37,9 @@ pnpm exec tsx core/tx-clear-signing/examples/showcase.ts
 
 `ping.ts` describes a create of `Canton.Internal.Ping:Ping`. `allocation.ts` describes an `AllocationFactory_Allocate` exercise through the V2 token-standard interface. `showcase.ts` describes five roots with descriptors this build does not ship: a governance lock, a featured app right and an activity marker exercised on that right, a Splitwell balance update, and a DSO vote. Each prints the wording and exits with an error if that wording changes.
 
-The ping example's preview computes `hashPreparedTransaction` for the pasted transaction and opens the approve page with that hash. The page calls `clearSign`.
+The ping example's preview opens the approve page with the pasted transaction. That page computes the transaction's hash and calls `clearSign`.
 
-The wallet gateway uses three more functions. A caller describing a transaction leaves them unused.
-
-| Function            | Where the wallet uses it                                                                                                                 |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `hashForReview`     | The approve page, to decide whether to offer approval before describing. `clearSign` runs the same check and throws `HashMismatchError`. |
-| `selectDescriptors` | The approve page, to narrow the descriptor list to the transaction's root templates. `clearSign` matches those roots itself.             |
-| `templateKey`       | The descriptor store, so an upload replaces the built-in descriptor for the same template.                                               |
+The wallet gateway uses one more function. A caller describing a transaction leaves it unused. `selectDescriptors` narrows the approve page's descriptor list to the transaction's root templates. `clearSign` matches those roots itself.
 
 The transaction detail renders the types `clearSign` returns (`TransactionDescription`, `OperationDescription`, `IntentPart`, `DescribedField`, `TemplateRef`). It calls none of these functions. The browser extension's approve page does not use this package.
 
@@ -54,9 +48,7 @@ The transaction detail renders the types `clearSign` returns (`TransactionDescri
 - `shippedDescriptors` returns the descriptors bundled with this build: the builtin Canton ping and bong templates (`Canton.Internal.Ping:Ping`, `Canton.Internal.Bong:BongProposal`, `Explode`, `Merge`, `Collapse`, `Bong`), and `Splice.ExternalPartyAmuletRules:ExternalPartyAmuletRules` in splice-amulet 0.1.22. That descriptor covers the create, and `TransferFactory_Transfer` and `AllocationFactory_Allocate` through the V1 and V2 token-standard interfaces, one exercise entry per interface. A registry or a trust policy plugs in by adding to the list the caller passes. The wallet gateway's approve page passes the shipped set and the descriptors uploaded on its Descriptors page, which are stored in that browser only and replace a shipped descriptor for the same template. The gateway merges those sources itself, then calls `selectDescriptors`.
 - `parseDescriptor` validates descriptor JSON against the schema and then checks the rules a JSON Schema cannot express: an operation declares each path once, every placeholder equals the path of a field of the same operation, and enum references exist. It throws `DescriptorError`. `$schema` must be `https://example.org/canton-clear-signing/v1/schema.json`, the schema's `$id`. That URL is a placeholder until a host is chosen.
 - `selectDescriptors` takes the transaction as base64 and the caller's candidates. It returns the candidates bound to the templates of the root nodes, one per template, in root order. A root template with no candidate is left out. It does not check the hash: choosing a descriptor decides nothing about trust. Two candidates for one template throw, whether or not the transaction uses that template.
-- `hashPreparedTransaction` returns the hashing-scheme V3 hash of the transaction bytes, base64. `clearSign` accepts that hash. A transaction that cannot be hashed throws.
-- `hashForReview` recomputes the hash of the transaction bytes and returns it when it equals the hash the caller was given, trying hashing scheme V3 and then V2. The given hash only selects the scheme. It returns undefined when neither scheme reproduces it, and throws when the transaction cannot be hashed, including when it contains an unknown protobuf field. A host gates approval on this alone, with the same function `clearSign` uses.
-- `clearSign` takes the transaction as base64, so unknown protobuf fields are refused, and the hash the user is asked to approve. It describes the transaction only if it hashes to that value, and throws `HashMismatchError` otherwise. Passing descriptors that the transaction does not use gives the same description as passing the result of `selectDescriptors`. It returns one `OperationDescription` per root node:
+- `clearSign` takes the transaction as base64, so unknown protobuf fields are refused, and the hash the user is asked to approve. It recomputes the hash, trying scheme V3 and then V2, and the given hash only selects the scheme. It describes the transaction only if the bytes hash to that value, and throws `HashMismatchError` otherwise. A transaction that cannot be hashed throws. Passing descriptors that the transaction does not use gives the same description as passing the result of `selectDescriptors`. It returns one `OperationDescription` per root node:
     - `described`: the interpolated intent rendered;
     - `fallback`: a placeholder did not resolve (or was `None`), so `intent` is the descriptor's stable intent;
     - `undescribed`: no descriptor covers the node, so `intent` is generic (`Create Module:Entity`);
@@ -123,5 +115,5 @@ A template can implement two interfaces with a choice of the same name, such as 
 
 The description is only as trustworthy as its binding to what is signed. The wallet binds them in two steps:
 
-1. `clearSign` describes the transaction only when `hashForReview` reproduces `expectedHash`, and returns that hash. The approve page passes the hash the gateway reports, and it calls the same `hashForReview` to decide whether approval is offered. A mismatch throws `HashMismatchError` and approval is disabled.
+1. `clearSign` describes the transaction only when the bytes hash to `expectedHash`, and returns that hash. The approve page passes the hash the gateway reports. A preview has no reported hash, so that page computes the scheme V3 hash of the bytes and passes it. A mismatch throws `HashMismatchError` and approval is disabled.
 2. `TransactionService.sign` recomputes the hash from the stored transaction and signs only if it equals both the stored hash and the hash the user approved. It logs the approval (user, party, hash, time) before anything reaches the signing provider. A service account's automated `signAndExecute` has no reviewer; its approval is logged as the service account's.

@@ -52,20 +52,17 @@ export function LedgerSubmission(props: {
     }
 
     // Accepts the JSON response of /v2/interactive-submission/prepare, or the bare base64
-    // preparedTransaction, and opens the wallet's approve page on it in preview mode.
-    function openApprovePreview() {
+    // preparedTransaction. Opens the approve page, which hashes the bytes and calls clearSign.
+    async function openApprovePreview() {
         setErrorMsg('')
         const input = previewInput.trim()
         let tx = input
-        let hash = ''
         if (input.startsWith('{')) {
             try {
                 const response = JSON.parse(input) as {
                     preparedTransaction?: string
-                    preparedTransactionHash?: string
                 }
                 tx = response.preparedTransaction ?? ''
-                hash = response.preparedTransactionHash ?? ''
             } catch {
                 setErrorMsg('The prepare response is not valid JSON.')
                 return
@@ -75,22 +72,21 @@ export function LedgerSubmission(props: {
             setErrorMsg('No preparedTransaction to preview.')
             return
         }
-        sdk.status()
-            .then((status) => {
-                const userUrl = status.provider.userUrl
-                if (!userUrl) {
-                    setErrorMsg('The wallet did not report its address.')
-                    return
-                }
-                const base = userUrl.replace(/\/login\/?$/, '')
-                const fragment = new URLSearchParams({ preview: tx, hash })
-                popup.open(`${base}/approve/index.html#${fragment}`)
-            })
-            .catch((err) => {
-                setErrorMsg(
-                    err instanceof Error ? err.message : JSON.stringify(err)
-                )
-            })
+        try {
+            const status = await sdk.status()
+            const userUrl = status.provider.userUrl
+            if (!userUrl) {
+                setErrorMsg('The wallet did not report its address.')
+                return
+            }
+            const base = userUrl.replace(/\/login\/?$/, '')
+            const fragment = new URLSearchParams({ preview: tx })
+            popup.open(`${base}/approve/index.html#${fragment}`)
+        } catch (err) {
+            setErrorMsg(
+                err instanceof Error ? err.message : JSON.stringify(err)
+            )
+        }
     }
 
     function createBongProposal() {

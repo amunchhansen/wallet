@@ -15,11 +15,7 @@ import {
     makeWallet,
     mockRequest,
 } from '../__tests__/test-helpers.js'
-import {
-    pingCreate,
-    pingCreateHash,
-    pingCreateWithoutSeed,
-} from '../__tests__/ping-transaction.js'
+import { pingCreate, pingCreateHash } from '../__tests__/ping-transaction.js'
 
 // A fetch root decodes and hashes. clearSign rejects it, because a root has to be a create or an
 // exercise. An empty prepared transaction cannot be hashed, which would also disable approval.
@@ -328,6 +324,7 @@ describe('UserUiApprove', () => {
                         kind: 'create',
                         template,
                         status: 'described',
+                        interpolatedIntent: 'Memo  was set',
                         intent: [
                             { kind: 'text', text: 'Memo ' },
                             {
@@ -400,11 +397,11 @@ describe('UserUiApprove', () => {
             history.replaceState({}, '', window.location.pathname)
         })
 
-        it('describes a transaction from the fragment without loading one', async () => {
+        it('hashes the transaction itself and describes it', async () => {
             history.replaceState(
                 {},
                 '',
-                `#preview=${encodeURIComponent(pingCreate)}&hash=${encodeURIComponent(pingCreateHash)}`
+                `#preview=${encodeURIComponent(pingCreate)}`
             )
             el = await fixture<ApproveUi>(componentFixture)
             await waitUntil(() => el.clearSigning !== null, 'preview described')
@@ -412,6 +409,7 @@ describe('UserUiApprove', () => {
             expect(el.status).toBe('preview')
             expect(el.disabled).toBe(true)
             expect(el.txHash).toBe(pingCreateHash)
+            expect(el.reviewedHash).toBe(pingCreateHash)
             expect(el.clearSigning?.complete).toBe(true)
             expect(mockRequest).not.toHaveBeenCalled()
             expect(
@@ -419,22 +417,17 @@ describe('UserUiApprove', () => {
             ).toContain('not a transaction to sign')
         })
 
-        it('describes a preview without a hash, even one that cannot be hashed', async () => {
+        it('describes from the transaction when the fragment also carries a hash', async () => {
             history.replaceState(
                 {},
                 '',
-                `#preview=${encodeURIComponent(pingCreateWithoutSeed)}`
+                `#preview=${encodeURIComponent(pingCreate)}&hash=${encodeURIComponent(btoa('x'.repeat(32)))}`
             )
             el = await fixture<ApproveUi>(componentFixture)
             await waitUntil(() => el.clearSigning !== null, 'preview described')
 
-            expect(el.reviewedHash).toBeNull()
-            expect(el.txHash).toBe('')
-            expect(el.clearSigning?.complete).toBe(true)
-            expect(el.clearSigning).not.toHaveProperty('hash')
-            expect(
-                el.shadowRoot?.querySelector('.alert-warning')?.textContent
-            ).toContain('not checked against one')
+            expect(el.txHash).toBe(pingCreateHash)
+            expect(el.hashMismatch).toBe(false)
         })
     })
 

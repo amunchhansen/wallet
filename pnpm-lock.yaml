@@ -3164,6 +3164,9 @@ importers:
       '@canton-network/core-tx-clear-signing':
         specifier: 'workspace:'
         version: link:../../core/tx-clear-signing
+      '@canton-network/core-tx-hashing':
+        specifier: 'workspace:'
+        version: link:../../core/tx-hashing
       '@canton-network/core-tx-visualizer':
         specifier: 'workspace:'
         version: link:../../core/tx-visualizer

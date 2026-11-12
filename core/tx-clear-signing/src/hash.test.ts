@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from 'vitest'
+import { HashingSchemeVersion } from '@canton-network/core-ledger-proto'
+import { computePreparedTransactionHash } from '@canton-network/core-tx-hashing'
 import { fromBase64, toBase64 } from './bytes.js'
-import { hashForReview, hashPreparedTransaction } from './hash.js'
+import { hashForReview } from './hash.js'
 import createAndExercise from './__tests__/fixtures/v2-create-and-exercise.json'
 import glLockCreate from './__tests__/fixtures/splice/gl-lock-create.json'
 
@@ -57,13 +59,14 @@ describe('hashForReview', () => {
     })
 })
 
-describe('hashPreparedTransaction', () => {
-    it('returns the V3 hash clearSign accepts', async () => {
-        await expect(
-            hashPreparedTransaction(glLockCreate.preparedTransaction)
-        ).resolves.toBe(glLockCreate.preparedTransactionHash)
+describe('hashForReview scheme selection', () => {
+    it('accepts the V3 hash of a transaction that also hashes under V2', async () => {
         const v2Transaction = createAndExercise.preparedTransaction
-        const v3Hash = await hashPreparedTransaction(v2Transaction)
+        const digest = await computePreparedTransactionHash(
+            v2Transaction,
+            HashingSchemeVersion.V3
+        )
+        const v3Hash = toBase64(digest)
         expect(v3Hash).not.toBe(hexToBase64(createAndExercise.expected.hash))
         await expect(hashForReview(v2Transaction, v3Hash)).resolves.toBe(v3Hash)
     })

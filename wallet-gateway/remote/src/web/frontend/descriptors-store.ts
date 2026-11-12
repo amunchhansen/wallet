@@ -5,7 +5,6 @@ import {
     type Descriptor,
     parseDescriptor,
     shippedDescriptors,
-    templateKey,
 } from '@canton-network/core-tx-clear-signing'
 import { VERSION_PREFIX } from './state-manager.js'
 
@@ -90,6 +89,11 @@ function writeStored(entries: unknown[]): void {
 
 function keyOf({ context }: Descriptor): string {
     return templateKey(context.template)
+}
+
+/** `packageId:moduleName:entityName`, so an upload replaces the shipped descriptor for that template. */
+function templateKey(template: Descriptor['context']['template']): string {
+    return `${template.packageId}:${template.moduleName}:${template.entityName}`
 }
 
 // The template key of a stored entry, or undefined when it no longer parses.

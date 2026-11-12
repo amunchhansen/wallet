@@ -1,7 +1,6 @@
 // Copyright (c) 2025-2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-export { hashForReview, hashPreparedTransaction } from './hash.js'
 export {
     HashMismatchError,
     clearSign,
@@ -21,10 +20,6 @@ export {
     type Exercise,
     type Operation,
 } from './descriptor.js'
-export {
-    templateKey,
-    TransactionShapeError,
-    type TemplateRef,
-} from './roots.js'
+export { TransactionShapeError, type TemplateRef } from './roots.js'
 export { selectDescriptors } from './select.js'
 export { shippedDescriptors } from './shipped.js'

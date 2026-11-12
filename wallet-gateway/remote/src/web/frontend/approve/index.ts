@@ -9,15 +9,17 @@ import {
     toRelHref,
 } from '@canton-network/core-wallet-ui-components'
 import {
+    computePreparedTransactionHash,
+    TxHashingError,
+} from '@canton-network/core-tx-hashing'
+import {
     type ParsedTransactionInfo,
     parsePreparedTransaction,
 } from '@canton-network/core-tx-visualizer'
 import {
     clearSign,
-    describeUnverified,
-    hashForReview,
+    HashMismatchError,
     selectDescriptors,
-    type Descriptor,
     type TransactionDescription,
 } from '@canton-network/core-tx-clear-signing'
 import { activeDescriptors } from '../descriptors-store.js'
@@ -76,7 +78,7 @@ export class ApproveUi extends BaseElement {
         const preview = new URLSearchParams(window.location.hash.slice(1))
         const previewTx = preview.get('preview')
         if (previewTx) {
-            void this.showPreview(previewTx, preview.get('hash') ?? '')
+            void this.showPreview(previewTx)
             return
         }
         const url = new URL(window.location.href)
@@ -132,8 +134,7 @@ export class ApproveUi extends BaseElement {
         this.origin = result.origin || null
         this.externalTxId = result.externalTxId || null
         this.failureReason = result.failureReason || null
-        await this.reviewHash(result.preparedTransactionHash)
-        await this.describeTransaction()
+        await this.describeTransaction(result.preparedTransactionHash)
 
         const wallets = await userClient.request({
             method: 'listWallets',
@@ -354,52 +355,75 @@ export class ApproveUi extends BaseElement {
     }
 
     /** Shows how a prepared transaction would be presented for approval, without loading or signing it. */
-    private async showPreview(tx: string, hash: string) {
-        const notice =
-            'This is a preview, not a transaction to sign. Nothing is submitted.'
+    private async showPreview(tx: string) {
         this.commandId = 'preview'
         this.status = 'preview'
         this.disabled = true
         this.tx = tx
-        if (hash) {
-            this.previewNotice = notice
-            await this.reviewHash(hash)
-            await this.describeTransaction()
-            return
-        }
-        // A hand-built transaction may lack what hashing needs, such as node seeds, so a preview
-        // without a hash is described unchecked.
-        this.previewNotice = `${notice} No hash was given, so the description is not checked against one.`
-        this.parseTransaction()
-        await this.describeWith((descriptors) =>
-            describeUnverified(tx, descriptors)
-        )
-    }
-
-    // The hash the gateway reports only selects the hashing scheme; what is shown and approved is the
-    // hash of the bytes on screen.
-    private async reviewHash(claimedHash: string) {
+        this.previewNotice =
+            'This is a preview, not a transaction to sign. Nothing is submitted.'
+        let hash: string
         try {
-            this.reviewedHash =
-                (await hashForReview(this.tx, claimedHash)) ?? null
+            hash = await previewTransactionHash(tx)
         } catch (error) {
             console.error('Error hashing prepared transaction:', error)
-            this.reviewedHash = null
-        }
-        this.hashMismatch = this.reviewedHash === null
-        this.txHash = this.reviewedHash ?? claimedHash
-    }
-
-    private async describeTransaction() {
-        this.parseTransaction()
-        const hash = this.reviewedHash
-        if (!hash) {
+            this.parseTransaction()
             this.clearSigning = null
+            this.reviewedHash = null
+            this.hashMismatch = false
+            this.txHash = ''
+            this.clearSigningError =
+                error instanceof Error ? error.message : String(error)
             return
         }
-        await this.describeWith((descriptors) =>
-            clearSign(this.tx, descriptors, hash)
-        )
+        await this.describeTransaction(hash)
+    }
+
+    /**
+     * Describes `this.tx` when it hashes to `claimedHash`. `clearSign` checks the hash, and its
+     * returned hash is the one a later sign request sends.
+     */
+    private async describeTransaction(claimedHash: string) {
+        this.parseTransaction()
+        const candidates = activeDescriptors().map((a) => a.descriptor)
+        // Selection throws before any hash check. The full list lets clearSign check the hash
+        // first, and it describes the same transaction when selection succeeds.
+        let descriptors = candidates
+        let selectionError: unknown
+        try {
+            descriptors = selectDescriptors(this.tx, candidates)
+        } catch (error) {
+            selectionError = error
+        }
+        try {
+            const described = await clearSign(this.tx, descriptors, claimedHash)
+            if (selectionError) throw selectionError
+            this.clearSigning = described
+            this.clearSigningError = null
+            this.reviewedHash = described.hash
+            this.hashMismatch = false
+            this.txHash = described.hash
+        } catch (error) {
+            console.error('Error describing prepared transaction:', error)
+            this.clearSigning = null
+            const hashFailed =
+                error instanceof HashMismatchError ||
+                error instanceof TxHashingError
+            if (hashFailed) {
+                this.reviewedHash = null
+                this.hashMismatch = true
+                this.clearSigningError = null
+                this.txHash = claimedHash
+                return
+            }
+            // clearSign checks the hash before it describes, so the hash matched and approval
+            // stays available. The detail view shows why the description failed.
+            this.reviewedHash = claimedHash
+            this.hashMismatch = false
+            this.txHash = claimedHash
+            this.clearSigningError =
+                error instanceof Error ? error.message : String(error)
+        }
     }
 
     private parseTransaction() {
@@ -408,25 +432,6 @@ export class ApproveUi extends BaseElement {
         } catch (error) {
             console.error('Error parsing prepared transaction:', error)
             this.txParsed = null
-        }
-    }
-
-    private async describeWith(
-        describe: (
-            descriptors: Descriptor[]
-        ) => TransactionDescription | Promise<TransactionDescription>
-    ) {
-        try {
-            const candidates = activeDescriptors().map((a) => a.descriptor)
-            const descriptors = selectDescriptors(this.tx, candidates)
-            this.clearSigning = await describe(descriptors)
-            this.clearSigningError = null
-        } catch (error) {
-            // A malformed transaction: the detail view shows why, and approval stays the user's call.
-            console.error('Error describing prepared transaction:', error)
-            this.clearSigning = null
-            this.clearSigningError =
-                error instanceof Error ? error.message : String(error)
         }
     }
 
@@ -484,4 +489,22 @@ export class ApproveUi extends BaseElement {
             ></wg-transaction-detail>
         `
     }
+}
+
+/**
+ * The scheme V3 hash of a prepared transaction, base64. A preview has no hash from a participant.
+ * `clearSign` tries V3 first, so this is the hash it accepts.
+ */
+async function previewTransactionHash(
+    preparedTransaction: string
+): Promise<string> {
+    const digest = await computePreparedTransactionHash(
+        preparedTransaction,
+        'HASHING_SCHEME_VERSION_V3'
+    )
+    let binary = ''
+    for (let i = 0; i < digest.byteLength; i++) {
+        binary += String.fromCharCode(digest[i] ?? 0)
+    }
+    return btoa(binary)
 }
