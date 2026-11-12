@@ -163,9 +163,10 @@ export class DescriptorError extends Error {
  * Validates descriptor JSON against the v1 schema, and then against the rules a JSON Schema cannot
  * express: an operation declares each path once, every placeholder equals the path of a field of the
  * same operation, every enum reference names a table, and no two exercise entries name the same
- * choice and interface. The result is what `clearSign` takes.
+ * choice and interface.
  *
- * The wallet gateway Descriptors page calls this to reject an upload before storing it.
+ * `clearSign` calls this. A descriptor that fails and still names a root template is reported on
+ * that root, and the other roots are still described.
  *
  * @throws DescriptorError listing every problem found
  */

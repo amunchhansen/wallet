@@ -19,9 +19,9 @@ import {
 import {
     clearSign,
     HashMismatchError,
-    selectDescriptors,
     type TransactionDescription,
 } from '@canton-network/core-tx-clear-signing'
+import { selectDescriptors } from '@canton-network/core-wallet-services/clear-signing'
 import { activeDescriptors } from '../descriptors-store.js'
 import { createUserClient } from '../rpc-client'
 import { setLocationHref } from '../navigation.js'
@@ -387,7 +387,8 @@ export class ApproveUi extends BaseElement {
         this.parseTransaction()
         const candidates = activeDescriptors().map((a) => a.descriptor)
         // Selection throws before any hash check. The full list lets clearSign check the hash
-        // first, and it describes the same transaction when selection succeeds.
+        // first. When the hash matches, a failed selection is what the page reports: passing the
+        // full list on would itself be rejected as too many descriptors.
         let descriptors = candidates
         let selectionError: unknown
         try {
@@ -418,11 +419,12 @@ export class ApproveUi extends BaseElement {
             }
             // clearSign checks the hash before it describes, so the hash matched and approval
             // stays available. The detail view shows why the description failed.
+            const reported = selectionError ?? error
             this.reviewedHash = claimedHash
             this.hashMismatch = false
             this.txHash = claimedHash
             this.clearSigningError =
-                error instanceof Error ? error.message : String(error)
+                reported instanceof Error ? reported.message : String(reported)
         }
     }
 

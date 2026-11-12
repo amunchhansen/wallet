@@ -3,21 +3,24 @@
 
 import { describe, expect, it } from 'vitest'
 import { PreparedTransaction } from '@canton-network/core-ledger-proto'
-import { clearSign } from './clear-sign.js'
-import { parseDescriptor, type Descriptor } from './descriptor.js'
-import { selectDescriptors } from './select.js'
 import {
-    TransactionShapeError,
+    parseDescriptor,
+    type Descriptor,
+} from '../../../tx-clear-signing/src/descriptor.js'
+import {
     decode,
     templateKey,
     type TemplateRef,
-} from './roots.js'
-import { encode, vectorDescriptor } from './__tests__/helpers.js'
-import { captured, capturedIds, spliceDescriptors } from './__tests__/splice.js'
-import allValues from './__tests__/fixtures/v2-create-all-values.json'
-import createAndExercise from './__tests__/fixtures/v2-create-and-exercise.json'
-import nestedCreates from './__tests__/fixtures/v2-exercise-nested-creates.json'
-import { builtinPingCreate } from './__tests__/fixtures/ping.js'
+} from '../../../tx-clear-signing/src/roots.js'
+import {
+    encode,
+    vectorDescriptor,
+} from '../../../tx-clear-signing/src/__tests__/helpers.js'
+import allValues from '../../../tx-clear-signing/src/__tests__/fixtures/v2-create-all-values.json'
+import createAndExercise from '../../../tx-clear-signing/src/__tests__/fixtures/v2-create-and-exercise.json'
+import nestedCreates from '../../../tx-clear-signing/src/__tests__/fixtures/v2-exercise-nested-creates.json'
+import { builtinPingCreate } from '../../../tx-clear-signing/src/__tests__/fixtures/ping.js'
+import { selectDescriptors } from './select.js'
 
 function names(descriptors: readonly Descriptor[]): string[] {
     return descriptors.map(
@@ -146,33 +149,16 @@ describe('selectDescriptors', () => {
         ).toThrow(/more than one descriptor for template/)
     })
 
-    it('rejects a transaction without a tree', () => {
-        const tx = encode(PreparedTransaction.create({}))
-        expect(() => selectDescriptors(tx, [])).toThrow(TransactionShapeError)
+    it('rejects a candidate that names no template', () => {
+        expect(() =>
+            selectDescriptors(builtinPingCreate, [{} as Descriptor])
+        ).toThrow(/no template/)
     })
 
-    it.each(capturedIds)(
-        '%s describes the same from the selected descriptors',
-        async (id) => {
-            const { preparedTransaction, preparedTransactionHash } =
-                captured(id)
-            const selected = selectDescriptors(
-                preparedTransaction,
-                spliceDescriptors
-            )
-            const [fromSelected, fromAll] = await Promise.all([
-                clearSign(
-                    preparedTransaction,
-                    selected,
-                    preparedTransactionHash
-                ),
-                clearSign(
-                    preparedTransaction,
-                    spliceDescriptors,
-                    preparedTransactionHash
-                ),
-            ])
-            expect(fromSelected).toEqual(fromAll)
-        }
-    )
+    it('rejects a transaction without a tree', () => {
+        const tx = encode(PreparedTransaction.create({}))
+        expect(() => selectDescriptors(tx, [])).toThrow(
+            /prepared transaction has no transaction/
+        )
+    })
 })

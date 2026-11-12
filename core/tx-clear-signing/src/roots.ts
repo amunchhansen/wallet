@@ -35,7 +35,7 @@ export interface ContractSet {
     duplicateIds: ReadonlySet<string>
 }
 
-export class TransactionShapeError extends Error {
+class TransactionShapeError extends Error {
     constructor(message: string) {
         super(message)
         this.name = 'TransactionShapeError'

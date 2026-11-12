@@ -8,8 +8,12 @@ import {
     type Value,
 } from '@canton-network/core-ledger-proto'
 import { decode } from './roots.js'
-import { HashMismatchError, clearSign } from './clear-sign.js'
-import { parseDescriptor } from './descriptor.js'
+import {
+    ExtraDescriptorsError,
+    HashMismatchError,
+    clearSign,
+} from './clear-sign.js'
+import { parseDescriptor, type Descriptor } from './descriptor.js'
 import {
     described,
     encode,
@@ -178,17 +182,25 @@ describe('clearSign', () => {
     })
 
     it('binds a descriptor to the exact package', async () => {
-        // Same module and entity, different package: the descriptor does not apply.
-        const result = await described(adminWorkflowsPingCreate, [ping])
-        expect(result.complete).toBe(false)
-        expect(result.operations[0]).toMatchObject({
+        // Same module and entity, different package: the descriptor is not a root of this
+        // transaction, so it is too many to describe it.
+        const key = `${ping.context.template.packageId}:${ping.context.template.moduleName}:${ping.context.template.entityName}`
+        await expect(
+            described(adminWorkflowsPingCreate, [ping])
+        ).rejects.toThrow(ExtraDescriptorsError)
+        await expect(
+            described(adminWorkflowsPingCreate, [ping])
+        ).rejects.toThrow(key)
+
+        const [op] = (await described(adminWorkflowsPingCreate, [])).operations
+        expect(op).toMatchObject({
             status: 'undescribed',
             intent: [
                 { kind: 'text', text: 'Create Canton.Internal.Ping:Ping' },
             ],
             fields: [],
         })
-        expect(result.operations[0]).not.toHaveProperty('descriptor')
+        expect(op).not.toHaveProperty('descriptor')
     })
 
     it('identifies a create without a descriptor', async () => {
@@ -644,7 +656,67 @@ describe('clearSign', () => {
     it('rejects two descriptors for one template', async () => {
         await expect(
             described(builtinPingCreate, [ping, ping])
-        ).rejects.toThrow('more than one descriptor')
+        ).rejects.toThrow(ExtraDescriptorsError)
+        await expect(
+            described(builtinPingCreate, [ping, ping])
+        ).rejects.toThrow(/is already described/)
+    })
+
+    it('rejects a descriptor the transaction does not use', async () => {
+        const other = vectorDescriptor('Other', {
+            create: { intent: 'Other' },
+        })
+        await expect(
+            described(builtinPingCreate, [ping, other])
+        ).rejects.toThrow(ExtraDescriptorsError)
+        await expect(
+            described(builtinPingCreate, [ping, other])
+        ).rejects.toThrow(/is not a root of the transaction/)
+    })
+
+    it('rejects a descriptor that names no template, and includes why it is invalid', async () => {
+        const broken = {} as Descriptor
+        const failed = described(builtinPingCreate, [ping, broken])
+        await expect(failed).rejects.toThrow(ExtraDescriptorsError)
+        await expect(failed).rejects.toThrow(/has no template/)
+        await expect(failed).rejects.toThrow(/\$schema/)
+    })
+
+    it('reports an invalid descriptor on the root it binds to', async () => {
+        const invalid = { ...pingJson, display: {} } as unknown as Descriptor
+        const result = await described(builtinPingCreate, [invalid])
+        expect(result.complete).toBe(false)
+        expect(result.operations[0]).toMatchObject({
+            status: 'invalid',
+            descriptor: PING_DESCRIPTOR,
+            fields: [],
+            intent: [
+                { kind: 'text', text: 'Create Canton.Internal.Ping:Ping' },
+            ],
+        })
+        expect(result.operations[0]?.reason).toContain(
+            'display needs create or exercises'
+        )
+    })
+
+    it('omits descriptor info when invalid metadata cannot be read', async () => {
+        const invalid = {
+            ...pingJson,
+            metadata: { version: '1.0.0' },
+        } as unknown as Descriptor
+        const [op] = (await described(builtinPingCreate, [invalid])).operations
+        expect(op).toMatchObject({ status: 'invalid' })
+        expect(op).not.toHaveProperty('descriptor')
+        expect(op?.reason).toContain('metadata.name')
+    })
+
+    it('checks the hash before it rejects extra descriptors', async () => {
+        const other = vectorDescriptor('Other', {
+            create: { intent: 'Other' },
+        })
+        await expect(
+            clearSign(builtinPingCreate, [ping, other], 'bm90LWEgaGFzaA==')
+        ).rejects.toThrow(HashMismatchError)
     })
 
     it('rejects two entries for one choice and interface', async () => {

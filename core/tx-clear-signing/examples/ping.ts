@@ -1,14 +1,15 @@
 // Copyright (c) 2025-2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-// A fixed Ping create, clear-signed with the descriptors shipped in this build.
+// A fixed Ping create, clear-signed with the shipped Ping descriptor.
 //
 // From the wallet repository:
 //   pnpm exec tsx core/tx-clear-signing/examples/ping.ts
 
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { clearSign, shippedDescriptors } from '../src/index.js'
+import ping from '../../wallet-services/src/clear-signing/descriptors/ping.json'
+import { clearSign, type Descriptor } from '../src/index.js'
 import { builtinPingCreate } from '../src/__tests__/fixtures/ping.js'
 
 /** Base64 prepared transaction, as `/v2/interactive-submission/prepare` returns it. */
@@ -24,7 +25,7 @@ export const intent =
 export function describePing() {
     return clearSign(
         preparedTransaction,
-        shippedDescriptors(),
+        [ping as Descriptor],
         preparedTransactionHash
     )
 }

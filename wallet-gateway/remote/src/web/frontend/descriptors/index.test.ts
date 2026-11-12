@@ -4,7 +4,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fixture } from '@open-wc/testing-helpers'
 import { html } from 'lit'
-import { shippedDescriptors } from '@canton-network/core-tx-clear-signing'
+import { shippedDescriptors } from '@canton-network/core-wallet-services/clear-signing'
 
 vi.mock('../index.js', () => ({}))
 vi.mock('../utils.js', () => ({ showToast: vi.fn() }))
@@ -71,13 +71,29 @@ describe('descriptors page', () => {
         expect(el.shadowRoot!.textContent).not.toContain('Uploaded pong')
     })
 
+    it('still lists a descriptor whose exercises field is not a list', async () => {
+        const el = await render()
+        await paste(
+            el,
+            JSON.stringify({
+                ...pong,
+                display: { exercises: { Respond: { intent: 'Respond' } } },
+            })
+        )
+
+        expect(el.shadowRoot!.textContent).toContain(
+            'Clear-signing descriptors'
+        )
+        expect(el.shadowRoot!.textContent).toContain('Uploaded pong')
+    })
+
     it('shows why a descriptor is rejected', async () => {
         const el = await render()
-        await paste(el, JSON.stringify({ ...pong, display: {} }))
+        await paste(el, JSON.stringify({ metadata: { name: 'no template' } }))
 
         expect(
             el.shadowRoot!.querySelector('.alert-danger')?.textContent
-        ).toContain('display needs create or exercises')
+        ).toContain('descriptor has no template')
 
         await paste(el, '{ not json')
         expect(el.problems).toEqual(['pasted JSON: not valid JSON'])

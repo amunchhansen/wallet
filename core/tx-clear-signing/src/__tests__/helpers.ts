@@ -18,6 +18,7 @@ import {
     type OperationDescription,
 } from '../clear-sign.js'
 import { type Descriptor, parseDescriptor } from '../descriptor.js'
+import { decode, rootNodes, templateKey, templateRef } from '../roots.js'
 
 /** Package of the templates in the core-tx-hashing vectors copied to fixtures/. */
 export const VECTOR_PACKAGE =
@@ -97,6 +98,37 @@ export async function hashEither(tx: string): Promise<string> {
         }
     }
     throw last
+}
+
+/**
+ * The descriptors bound to the create and exercise roots of `tx`, one per template. A catalog passed
+ * to `clearSign` whole is rejected: a descriptor the transaction does not use is too many.
+ */
+export function descriptorsForRoots(
+    tx: string,
+    descriptors: readonly Descriptor[]
+): Descriptor[] {
+    const keys = new Set<string>()
+    for (const node of rootNodes(decode(tx))) {
+        if (node.kind === 'create') {
+            keys.add(
+                templateKey(templateRef(node.create.templateId, node.nodeId))
+            )
+        } else if (node.kind === 'exercise') {
+            keys.add(
+                templateKey(templateRef(node.exercise.templateId, node.nodeId))
+            )
+        }
+    }
+    const chosen: Descriptor[] = []
+    const seen = new Set<string>()
+    for (const descriptor of descriptors) {
+        const key = templateKey(descriptor.context.template)
+        if (!keys.has(key) || seen.has(key)) continue
+        seen.add(key)
+        chosen.push(descriptor)
+    }
+    return chosen
 }
 
 /** Describes a transaction after hashing it, as the approve page does. */

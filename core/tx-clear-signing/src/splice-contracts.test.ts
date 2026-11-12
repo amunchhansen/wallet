@@ -11,7 +11,11 @@ import { HashingSchemeVersion } from '@canton-network/core-ledger-proto'
 import { computePreparedTransactionHash } from '@canton-network/core-tx-hashing'
 import { toBase64 } from './bytes.js'
 import type { OperationDescription } from './clear-sign.js'
-import { described, intentText } from './__tests__/helpers.js'
+import {
+    described,
+    descriptorsForRoots,
+    intentText,
+} from './__tests__/helpers.js'
 import {
     ALICE,
     BOB,
@@ -32,16 +36,20 @@ import {
 async function describeOne(
     preparedTransaction: string
 ): Promise<OperationDescription> {
-    const { operations } = await described(
-        preparedTransaction,
-        spliceDescriptors
-    )
+    const { operations } = await describedSplice(preparedTransaction)
     expect(operations).toHaveLength(1)
     return operations[0]!
 }
 
 const describeCaptured = (id: string) =>
     describeOne(captured(id).preparedTransaction)
+
+function describedSplice(preparedTransaction: string) {
+    return described(
+        preparedTransaction,
+        descriptorsForRoots(preparedTransaction, spliceDescriptors)
+    )
+}
 
 type Field = OperationDescription['fields'][number]
 
@@ -241,7 +249,7 @@ describe('V1 and V2 AllocationFactory_Allocate each have their own entry', () =>
             'Amulet administrator': DSO,
             'Number of legs': '2',
         })
-        expect((await described(tx, spliceDescriptors)).complete).toBe(true)
+        expect((await describedSplice(tx)).complete).toBe(true)
     })
 
     it('describes V1', async () => {
@@ -254,7 +262,7 @@ describe('V1 and V2 AllocationFactory_Allocate each have their own entry', () =>
         expect(intentText(op)).toBe(
             `Allocate 75.0000000000 Amulet from ${ALICE} to ${BOB} for settlement trade-7, executed by ${PROVIDER}`
         )
-        expect((await described(tx, spliceDescriptors)).complete).toBe(true)
+        expect((await describedSplice(tx)).complete).toBe(true)
     })
 })
 
@@ -471,7 +479,7 @@ describe('wallet and apps', () => {
             Metadata: 'None (absent)',
         })
         // An absent field is not a failure: the transaction is still completely described
-        expect((await described(tx, spliceDescriptors)).complete).toBe(true)
+        expect((await describedSplice(tx)).complete).toBe(true)
     })
 
     it('describes the input contracts the simulations use', async () => {

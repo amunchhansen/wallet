@@ -5,10 +5,7 @@ import { css, html, nothing } from 'lit'
 import { customElement, state } from 'lit/decorators.js'
 
 import { BaseElement } from '@canton-network/core-wallet-ui-components'
-import {
-    type Descriptor,
-    DescriptorError,
-} from '@canton-network/core-tx-clear-signing'
+import type { Descriptor } from '@canton-network/core-wallet-services/clear-signing'
 
 import '../index'
 import {
@@ -18,6 +15,19 @@ import {
     removeDescriptor,
 } from '../descriptors-store.js'
 import { showToast } from '../utils.js'
+
+function choiceLabel(entry: unknown): string {
+    if (entry === null || typeof entry !== 'object') return ''
+    const choice = 'choice' in entry ? entry.choice : undefined
+    if (typeof choice !== 'string') return ''
+    const iface = 'interface' in entry ? entry.interface : undefined
+    if (iface === null || typeof iface !== 'object') return choice
+    const moduleName = 'moduleName' in iface ? iface.moduleName : undefined
+    const entityName = 'entityName' in iface ? iface.entityName : undefined
+    return typeof moduleName === 'string' && typeof entityName === 'string'
+        ? `${choice} via ${moduleName}:${entityName}`
+        : choice
+}
 
 const SOURCE_BADGE: Record<ActiveDescriptor['source'], string> = {
     'built-in': 'text-bg-secondary',
@@ -94,17 +104,16 @@ export class UserUiDescriptors extends BaseElement {
     private add(json: unknown, origin: string): boolean {
         try {
             const d = addDescriptor(json)
-            showToast('', `Added '${d.metadata.name}' (${origin})`, 'success')
+            showToast(
+                '',
+                `Added '${d.metadata?.name ?? 'descriptor'}' (${origin})`,
+                'success'
+            )
             return true
         } catch (error) {
-            const problems =
-                error instanceof DescriptorError
-                    ? error.problems
-                    : [error instanceof Error ? error.message : String(error)]
-            this.problems = [
-                ...this.problems,
-                ...problems.map((p) => `${origin}: ${p}`),
-            ]
+            const message =
+                error instanceof Error ? error.message : String(error)
+            this.problems = [...this.problems, `${origin}: ${message}`]
             return false
         }
     }
@@ -140,7 +149,11 @@ export class UserUiDescriptors extends BaseElement {
 
     private deleteUpload(d: Descriptor) {
         removeDescriptor(d)
-        showToast('', `Removed '${d.metadata.name}'`, 'success')
+        showToast(
+            '',
+            `Removed '${d.metadata?.name ?? 'descriptor'}'`,
+            'success'
+        )
         this.reload()
     }
 
@@ -150,7 +163,9 @@ export class UserUiDescriptors extends BaseElement {
             <p class="text-body-secondary small">
                 Uploaded descriptors are stored in this browser only and are
                 used by the approve page here. They are not verified. An upload
-                for the template of a built-in descriptor replaces it.
+                is kept when it names a template, and one for the template of a
+                built-in descriptor replaces it. The approve page reports a
+                descriptor that is not valid.
             </p>
 
             <section class="upload">
@@ -200,37 +215,72 @@ export class UserUiDescriptors extends BaseElement {
                 }
             </section>
 
-            ${this.descriptors.map((a) => this.renderDescriptor(a))}
+            ${this.descriptors.map((a) => this.renderCard(a))}
         `
     }
 
+    private renderCard(active: ActiveDescriptor) {
+        try {
+            return this.renderDescriptor(active)
+        } catch (error) {
+            const message =
+                error instanceof Error ? error.message : String(error)
+            return html`<section class="descriptor">
+                <p class="text-danger mb-0">${message}</p>
+            </section>`
+        }
+    }
+
     private renderDescriptor({ descriptor, source }: ActiveDescriptor) {
-        const { metadata, context, display } = descriptor
-        const { packageId, moduleName, entityName } = context.template
-        const choices = (display.exercises ?? []).map((entry) =>
-            entry.interface
-                ? `${entry.choice} via ${entry.interface.moduleName}:${entry.interface.entityName}`
-                : entry.choice
-        )
+        // An upload is kept once it names a template, so exercises may not be a list.
+        // Mapping a non-list throws, and Lit then draws no cards at all.
+        const shown = descriptor as {
+            metadata?: {
+                name?: string
+                version?: string
+                publisher?: string
+            }
+            context?: { template?: Descriptor['context']['template'] }
+            display?: { create?: unknown; exercises?: unknown }
+        }
+        const metadata = shown.metadata
+        const template = shown.context?.template
+        const exercises = shown.display?.exercises
+        const choices = Array.isArray(exercises)
+            ? exercises.flatMap((entry) => {
+                  const label = choiceLabel(entry)
+                  return label === '' ? [] : [label]
+              })
+            : []
         return html`
             <section class="descriptor">
                 <div class="descriptor-heading">
-                    <h2 class="h6 fw-semibold mb-0">${metadata.name}</h2>
+                    <h2 class="h6 fw-semibold mb-0">
+                        ${metadata?.name ?? 'Untitled descriptor'}
+                    </h2>
                     <span class="badge rounded-pill ${SOURCE_BADGE[source]}"
                         >${source}</span
                     >
                 </div>
                 <dl class="small">
                     <dt>Version</dt>
-                    <dd>${metadata.version}</dd>
+                    <dd>${metadata?.version ?? ''}</dd>
                     <dt>Publisher</dt>
-                    <dd>${metadata.publisher}</dd>
+                    <dd>${metadata?.publisher ?? ''}</dd>
                     <dt>Template</dt>
-                    <dd class="identifier">${moduleName}:${entityName}</dd>
+                    <dd class="identifier">
+                        ${
+                            template
+                                ? `${template.moduleName}:${template.entityName}`
+                                : ''
+                        }
+                    </dd>
                     <dt>Package</dt>
-                    <dd class="identifier">${packageId}</dd>
+                    <dd class="identifier">${template?.packageId ?? ''}</dd>
                     <dt>Create</dt>
-                    <dd>${display.create ? 'described' : 'not described'}</dd>
+                    <dd>
+                        ${shown.display?.create ? 'described' : 'not described'}
+                    </dd>
                     <dt>Choices</dt>
                     <dd class="identifier">
                         ${choices.length ? choices.join(', ') : 'none'}

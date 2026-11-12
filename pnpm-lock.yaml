@@ -1950,9 +1950,15 @@ importers:
       '@canton-network/core-ledger-client':
         specifier: 'workspace:'
         version: link:../ledger-client
+      '@canton-network/core-ledger-proto':
+        specifier: 'workspace:'
+        version: link:../ledger-proto
       '@canton-network/core-signing-lib':
         specifier: 'workspace:'
         version: link:../signing-lib
+      '@canton-network/core-tx-clear-signing':
+        specifier: 'workspace:'
+        version: link:../tx-clear-signing
       '@canton-network/core-tx-hashing':
         specifier: 'workspace:'
         version: link:../tx-hashing

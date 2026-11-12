@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import {
-    DescriptorError,
-    shippedDescriptors,
-} from '@canton-network/core-tx-clear-signing'
+import { shippedDescriptors } from '@canton-network/core-wallet-services/clear-signing'
 import { StateManager } from './state-manager.js'
 import {
     activeDescriptors,
@@ -71,9 +68,9 @@ describe('descriptors store', () => {
         })
     })
 
-    it('rejects an invalid descriptor and stores nothing', () => {
-        expect(() => addDescriptor({ ...builtInPing, display: {} })).toThrow(
-            DescriptorError
+    it('rejects a descriptor without a template and stores nothing', () => {
+        expect(() => addDescriptor({ ...builtInPing, context: {} })).toThrow(
+            /no template/
         )
         expect(uploadedDescriptors()).toEqual([])
     })

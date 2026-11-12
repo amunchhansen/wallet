@@ -3,12 +3,14 @@
 
 import type { Value } from '@canton-network/core-ledger-proto'
 import { hashForReview } from './hash.js'
-import type {
-    Descriptor,
-    Exercise,
-    Field,
-    Format,
-    Operation,
+import {
+    DescriptorError,
+    parseDescriptor,
+    type Descriptor,
+    type Exercise,
+    type Field,
+    type Format,
+    type Operation,
 } from './descriptor.js'
 import { FormatError, enumKey, formatValue, type EnumTables } from './format.js'
 import { CONTRACT_PREFIX, parseIntent } from './intent.js'
@@ -30,7 +32,6 @@ import {
     type RootNode,
     type TemplateRef,
 } from './roots.js'
-import { indexByTemplate } from './select.js'
 
 export interface DescribedField {
     label: string
@@ -95,15 +96,22 @@ export interface OperationDescription {
     /**
      * `described`: the interpolated intent rendered. `fallback`: a placeholder failed, so `intent` is
      * the descriptor's stable intent. `undescribed`: no descriptor covers the node, so `intent` is
-     * generic. `undescribable`: the node itself cannot be read (its contract is missing or
-     * ambiguous, or it is not a create or an exercise); `reason` says why. `status` is about the
-     * intent. `complete` is false when any root is not `described` or any field has an error.
+     * generic. `invalid`: a descriptor binds to the node but is not a valid descriptor; `reason`
+     * lists what is wrong with it. `undescribable`: the node itself cannot be read (its contract is
+     * missing or ambiguous, or it is not a create or an exercise); `reason` says why. `status` is
+     * about the intent. `complete` is false when any root is not `described` or any field has an error.
      */
-    status: 'described' | 'fallback' | 'undescribed' | 'undescribable'
+    status:
+        | 'described'
+        | 'fallback'
+        | 'undescribed'
+        | 'invalid'
+        | 'undescribable'
     /**
-     * The sentence, with values filled in. On `fallback`, `undescribed` and `undescribable` it is the
-     * sentence `intent` shows: the descriptor's stable intent, or a generic one. `intent` keeps each
-     * value apart from the wording, so a wallet can render a value separately from the sentence.
+     * The sentence, with values filled in. On `fallback`, `undescribed`, `invalid` and `undescribable`
+     * it is the sentence `intent` shows: the descriptor's stable intent, or a generic one. `intent`
+     * keeps each value apart from the wording, so a wallet can render a value separately from the
+     * sentence.
      */
     interpolatedIntent: string
     intent: IntentPart[]
@@ -132,6 +140,29 @@ export class HashMismatchError extends Error {
     }
 }
 
+/** Why a descriptor passed to `clearSign` is not one of the transaction's roots. */
+export interface ExtraDescriptor {
+    /** Index in the descriptors `clearSign` was given. */
+    index: number
+    /** `packageId:moduleName:entityName`, when the descriptor names a template. */
+    template?: string
+    reason: 'unused' | 'duplicate' | 'unreadable'
+    /** Problems from validating the descriptor, when it is not valid. */
+    problems?: readonly string[]
+}
+
+/**
+ * `clearSign` was given a descriptor that is not a single binding for a root template: it names no
+ * template, it names a template that is not a create or exercise root, or another descriptor already
+ * binds that template. The transaction is not described.
+ */
+export class ExtraDescriptorsError extends Error {
+    constructor(readonly extras: readonly ExtraDescriptor[]) {
+        super(extraMessage(extras))
+        this.name = 'ExtraDescriptorsError'
+    }
+}
+
 type Header = Pick<
     OperationDescription,
     'nodeId' | 'kind' | 'template' | 'choiceId' | 'interface' | 'nodeType'
@@ -152,19 +183,23 @@ interface Selected {
  * function a caller uses. Child nodes are consequences of their root's choice, which the root's
  * descriptor words.
  *
- * The descriptors are the caller's trusted set, from `parseDescriptor` or `shippedDescriptors`, at
- * most one per template. A descriptor the transaction does not use is ignored: `clearSign` matches
- * each root by package ID, module and entity.
+ * Pass the descriptors for this transaction's create and exercise roots, one per template.
+ * `clearSign` validates each one. A root with no descriptor is `undescribed`. A descriptor that
+ * binds to a root but is not valid leaves that root `invalid`, and `reason` lists the problems. A
+ * descriptor that names no template, names a template that is not such a root, or repeats a template
+ * is too many: `clearSign` throws `ExtraDescriptorsError` and does not describe the transaction.
  *
  * The description is only as trustworthy as its binding to what is signed. `expectedHash` is the hash
  * the user is asked to approve; the transaction is described only when it hashes to that value.
- * Hashing also rejects a transaction with duplicate or unreachable nodes.
+ * Hashing also rejects a transaction with duplicate or unreachable nodes. The hash is checked before
+ * the descriptors are.
  *
  * @param tx - the prepared transaction, base64-encoded
- * @param descriptors - descriptors already validated with `parseDescriptor`; at most one per template
+ * @param descriptors - one descriptor per create or exercise root template
  * @param expectedHash - the hash the transaction must have, as base64
  * @throws HashMismatchError when the transaction does not hash to `expectedHash`
- * @throws Error when the transaction cannot be hashed, two descriptors bind the same template, or the transaction is malformed
+ * @throws ExtraDescriptorsError when a descriptor is unused, repeated, or has no template
+ * @throws Error when the transaction cannot be hashed or is malformed
  */
 export async function clearSign(
     tx: string,
@@ -184,11 +219,10 @@ function describeRoots(
     descriptors: readonly Descriptor[]
 ): TransactionDescription {
     const prepared = decode(tx)
-    const byTemplate = indexByTemplate(descriptors)
+    const roots = rootNodes(prepared)
+    const bound = bindDescriptors(descriptors, rootTemplateKeys(roots))
     const contracts = contractsOf(prepared)
-    const operations = rootNodes(prepared).map((node) =>
-        describeNode(node, contracts, byTemplate)
-    )
+    const operations = roots.map((node) => describeNode(node, contracts, bound))
     const complete = operations.every(
         (op) => op.status === 'described' && op.fields.every(resolved)
     )
@@ -199,10 +233,170 @@ function resolved(field: DescribedField): boolean {
     return field.error === undefined
 }
 
+/** A descriptor bound to one root template, valid or not. */
+type Bound =
+    | { ok: true; descriptor: Descriptor; info: DescriptorInfo }
+    | { ok: false; problems: readonly string[]; info?: DescriptorInfo }
+
+/**
+ * One descriptor per create or exercise root template. Anything else is too many, and the
+ * transaction is not described. An invalid descriptor that does name such a template is kept, so
+ * that root can be reported as `invalid`.
+ */
+function bindDescriptors(
+    descriptors: readonly Descriptor[],
+    rootKeys: ReadonlySet<string>
+): Map<string, Bound> {
+    const bound = new Map<string, Bound>()
+    const extras: ExtraDescriptor[] = []
+    for (const [index, json] of descriptors.entries()) {
+        const inspected = inspect(json)
+        const template = inspected.template
+        if (!template) {
+            extras.push(extra(index, 'unreadable', inspected.problems))
+            continue
+        }
+        const key = templateKey(template)
+        if (!rootKeys.has(key)) {
+            extras.push(extra(index, 'unused', inspected.problems, key))
+            continue
+        }
+        if (bound.has(key)) {
+            extras.push(extra(index, 'duplicate', inspected.problems, key))
+            continue
+        }
+        bound.set(
+            key,
+            inspected.parsed
+                ? {
+                      ok: true,
+                      descriptor: inspected.parsed,
+                      info: descriptorInfo(inspected.parsed),
+                  }
+                : {
+                      ok: false,
+                      problems: inspected.problems ?? [],
+                      ...(inspected.info && { info: inspected.info }),
+                  }
+        )
+    }
+    if (extras.length > 0) throw new ExtraDescriptorsError(extras)
+    return bound
+}
+
+function rootTemplateKeys(nodes: readonly RootNode[]): Set<string> {
+    const keys = new Set<string>()
+    for (const node of nodes) {
+        if (node.kind === 'create') {
+            keys.add(
+                templateKey(templateRef(node.create.templateId, node.nodeId))
+            )
+        } else if (node.kind === 'exercise') {
+            keys.add(
+                templateKey(templateRef(node.exercise.templateId, node.nodeId))
+            )
+        }
+    }
+    return keys
+}
+
+interface Inspected {
+    template?: TemplateRef
+    parsed?: Descriptor
+    problems?: string[]
+    info?: DescriptorInfo
+}
+
+/** A valid descriptor, or the template and problems of one that is not. */
+function inspect(json: unknown): Inspected {
+    try {
+        const parsed = parseDescriptor(json)
+        return { template: parsed.context.template, parsed }
+    } catch (err) {
+        if (!(err instanceof DescriptorError)) throw err
+        const template = readTemplate(json)
+        const info = looseInfo(json)
+        return {
+            problems: err.problems,
+            ...(template && { template }),
+            ...(info && { info }),
+        }
+    }
+}
+
+/**
+ * `packageId`, `moduleName` and `entityName` when they are non-empty strings. Validation can fail
+ * and still leave a template that a root can be bound to.
+ */
+function readTemplate(json: unknown): TemplateRef | undefined {
+    if (typeof json !== 'object' || json === null) return undefined
+    const context = (json as { context?: unknown }).context
+    if (typeof context !== 'object' || context === null) return undefined
+    const template = (context as { template?: unknown }).template
+    if (typeof template !== 'object' || template === null) return undefined
+    const fields = template as Record<string, unknown>
+    const packageId = nonEmpty(fields.packageId)
+    const moduleName = nonEmpty(fields.moduleName)
+    const entityName = nonEmpty(fields.entityName)
+    if (!packageId || !moduleName || !entityName) return undefined
+    return { packageId, moduleName, entityName }
+}
+
+/** Metadata the wallet can show, when the three displayed strings are present. */
+function looseInfo(json: unknown): DescriptorInfo | undefined {
+    if (typeof json !== 'object' || json === null) return undefined
+    const metadata = (json as { metadata?: unknown }).metadata
+    if (typeof metadata !== 'object' || metadata === null) return undefined
+    const fields = metadata as Record<string, unknown>
+    const name = nonEmpty(fields.name)
+    const publisher = nonEmpty(fields.publisher)
+    const version = nonEmpty(fields.version)
+    if (!name || !publisher || !version) return undefined
+    const url = nonEmpty(fields.url)
+    return { name, publisher, version, ...(url && { url }) }
+}
+
+function nonEmpty(value: unknown): string | undefined {
+    if (typeof value !== 'string' || value === '') return undefined
+    return value
+}
+
+function extra(
+    index: number,
+    reason: ExtraDescriptor['reason'],
+    problems: readonly string[] | undefined,
+    template?: string
+): ExtraDescriptor {
+    const described: ExtraDescriptor = { index, reason }
+    if (template) described.template = template
+    if (problems && problems.length > 0) described.problems = problems
+    return described
+}
+
+function extraMessage(extras: readonly ExtraDescriptor[]): string {
+    return `too many descriptors: ${extras.map(describeExtra).join('; ')}`
+}
+
+function describeExtra(extraDescriptor: ExtraDescriptor): string {
+    const subject = extraDescriptor.template
+        ? `template '${extraDescriptor.template}'`
+        : `descriptor ${extraDescriptor.index}`
+    const why =
+        extraDescriptor.reason === 'duplicate'
+            ? 'is already described'
+            : extraDescriptor.reason === 'unused'
+              ? 'is not a root of the transaction'
+              : 'has no template'
+    const problems = extraDescriptor.problems?.length
+        ? ` (${extraDescriptor.problems.join('; ')})`
+        : ''
+    return `${subject} ${why}${problems}`
+}
+
 function describeNode(
     node: RootNode,
     contracts: ContractSet,
-    byTemplate: Map<string, Descriptor>
+    bound: Map<string, Bound>
 ): OperationDescription {
     const header = nodeHeader(node)
     if (node.kind === 'other') {
@@ -213,21 +407,38 @@ function describeNode(
             )
         )
     }
-    const descriptor = header.template
-        ? byTemplate.get(templateKey(header.template))
-        : undefined
-    const bound = descriptor && { descriptor: descriptorInfo(descriptor) }
-    const selected = descriptor && selectOperation(node, descriptor, contracts)
+    const key = header.template && templateKey(header.template)
+    const match = key ? bound.get(key) : undefined
+    if (!match) {
+        return withIntent({
+            ...header,
+            status: 'undescribed',
+            intent: [text(genericIntent(header))],
+            fields: [],
+        })
+    }
+    const info = { ...(match.info && { descriptor: match.info }) }
+    if (!match.ok) {
+        return withIntent({
+            ...header,
+            ...info,
+            status: 'invalid',
+            reason: match.problems.join('; '),
+            intent: [text(genericIntent(header))],
+            fields: [],
+        })
+    }
+    const selected = selectOperation(node, match.descriptor, contracts)
     if (selected?.reason) {
         return withIntent({
             ...undescribable(header, selected.reason),
-            ...bound,
+            ...info,
         })
     }
     if (!selected?.selected) {
         return withIntent({
             ...header,
-            ...bound,
+            ...info,
             status: 'undescribed',
             intent: [text(genericIntent(header))],
             fields: [],
@@ -235,7 +446,7 @@ function describeNode(
     }
     return withIntent({
         ...header,
-        ...bound,
+        ...info,
         ...describeOperation(selected.selected),
     })
 }

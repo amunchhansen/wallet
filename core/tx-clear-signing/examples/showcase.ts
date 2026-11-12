@@ -10,7 +10,7 @@
 
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { clearSign, parseDescriptor } from '../src/index.js'
+import { clearSign, type Descriptor } from '../src/index.js'
 import governanceLock from '../src/__tests__/schema-examples/splice/governance-lock.json'
 import featuredAppRight from '../src/__tests__/schema-examples/splice/featured-app-right.json'
 import splitwell from '../src/__tests__/schema-examples/splice/splitwell-balance-update.json'
@@ -33,9 +33,12 @@ export const intents = [
     'Request a vote by alice::1220preview: Raise maxTextLength',
 ] as const
 
-const descriptors = [governanceLock, featuredAppRight, splitwell, dsoRules].map(
-    (json) => parseDescriptor(json)
-)
+const descriptors = [
+    governanceLock,
+    featuredAppRight,
+    splitwell,
+    dsoRules,
+] as unknown as Descriptor[]
 
 export function describeShowcase() {
     return clearSign(preparedTransaction, descriptors, preparedTransactionHash)
@@ -49,7 +52,7 @@ async function run(): Promise<void> {
     if (actual !== expected) {
         throw new Error(`wording changed:\n${actual}`)
     }
-    console.log(actual)
+    console.log(result.operations[0])
 }
 
 const entry = process.argv[1]

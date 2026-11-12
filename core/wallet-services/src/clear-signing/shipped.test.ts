@@ -2,14 +2,29 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from 'vitest'
-import type { OperationDescription } from './clear-sign.js'
-import { described, intentText } from './__tests__/helpers.js'
-import { allocationV2Multileg } from './__tests__/fixtures/allocation-v2-multileg.js'
-import { builtinPingCreate } from './__tests__/fixtures/ping.js'
+import {
+    clearSign,
+    type OperationDescription,
+} from '../../../tx-clear-signing/src/clear-sign.js'
+import {
+    hashEither,
+    intentText,
+} from '../../../tx-clear-signing/src/__tests__/helpers.js'
+import { allocationV2Multileg } from '../../../tx-clear-signing/src/__tests__/fixtures/allocation-v2-multileg.js'
+import { builtinPingCreate } from '../../../tx-clear-signing/src/__tests__/fixtures/ping.js'
+import { selectDescriptors } from './select.js'
 import { shippedDescriptors } from './shipped.js'
 
 function field(op: OperationDescription | undefined, path: string) {
     return op?.fields.find((f) => f.path === path)?.value
+}
+
+async function described(tx: string) {
+    return clearSign(
+        tx,
+        selectDescriptors(tx, shippedDescriptors()),
+        await hashEither(tx)
+    )
 }
 
 const pingPackageId =
@@ -26,16 +41,11 @@ describe('shippedDescriptors', () => {
             moduleName: 'Canton.Internal.Ping',
             entityName: 'Ping',
         })
-        expect(
-            (await described(builtinPingCreate, shippedDescriptors())).complete
-        ).toBe(true)
+        expect((await described(builtinPingCreate)).complete).toBe(true)
     })
 
     it('describes a captured two-leg allocation', async () => {
-        const result = await described(
-            allocationV2Multileg,
-            shippedDescriptors()
-        )
+        const result = await described(allocationV2Multileg)
         const op = result.operations[0]
 
         expect(result.complete).toBe(true)
