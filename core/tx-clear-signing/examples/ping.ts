@@ -20,7 +20,7 @@ export const preparedTransactionHash =
     'SY+x4x4DoOTcb5VbJN/jScYltMJeDzBhFpBYdmN97PY='
 
 export const intent =
-    'Ping 04d887dd-15b8-4954-8b79-a853811ce7cf from v1-01-alice::1220ee2624190834dddf28f194685acee8f00cbde9ee0d211dae277f4d799884f289 to v1-01-alice::1220ee2624190834dddf28f194685acee8f00cbde9ee0d211dae277f4d799884f289'
+    'Ping "04d887dd-15b8-4954-8b79-a853811ce7cf" from v1-01-alice::1220ee2624190834dddf28f194685acee8f00cbde9ee0d211dae277f4d799884f289 to v1-01-alice::1220ee2624190834dddf28f194685acee8f00cbde9ee0d211dae277f4d799884f289'
 
 export function describePing() {
     return clearSign(
@@ -32,7 +32,7 @@ export function describePing() {
 
 async function run(): Promise<void> {
     const result = await describePing()
-    const wording = result.operations[0]?.interpolatedIntent
+    const wording = result.operations[0]?.intent
     if (wording !== intent) {
         throw new Error(`wording changed: ${wording}`)
     }

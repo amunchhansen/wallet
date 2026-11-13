@@ -10,7 +10,6 @@ import {
 import {
     describeShowcase,
     intents as showcaseIntents,
-    preparedTransactionHash as showcaseHash,
 } from '../examples/showcase.js'
 
 describe('standalone examples', () => {
@@ -18,7 +17,7 @@ describe('standalone examples', () => {
         const result = await describePing()
         expect(result.complete).toBe(true)
         expect(result.operations).toHaveLength(1)
-        expect(result.operations[0]?.interpolatedIntent).toBe(pingIntent)
+        expect(result.operations[0]?.intent).toBe(pingIntent)
     })
 
     it('describes the two-leg allocation', async () => {
@@ -28,13 +27,12 @@ describe('standalone examples', () => {
         expect(result.operations[0]?.choiceId).toBe(
             'AllocationFactory_Allocate'
         )
-        expect(result.operations[0]?.interpolatedIntent).toBe(allocationIntent)
+        expect(result.operations[0]?.intent).toBe(allocationIntent)
     })
 
     it('describes the five-root splice showcase', async () => {
         const result = await describeShowcase()
         expect(result.complete).toBe(true)
-        expect(result.hash).toBe(showcaseHash)
         expect(result.operations).toHaveLength(5)
         expect(result.operations[2]?.choiceId).toBe(
             'FeaturedAppRight_CreateActivityMarker'
@@ -43,7 +41,7 @@ describe('standalone examples', () => {
             'Splice.Api.FeaturedAppRightV2'
         )
         expect(result.operations[4]?.choiceId).toBe('DsoRules_RequestVote')
-        expect(result.operations.map((op) => op.interpolatedIntent)).toEqual([
+        expect(result.operations.map((op) => op.intent)).toEqual([
             ...showcaseIntents,
         ])
     })

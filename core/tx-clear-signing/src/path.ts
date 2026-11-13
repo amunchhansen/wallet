@@ -3,6 +3,9 @@
 
 import type { Value } from '@canton-network/core-ledger-proto'
 
+/** The prefix of a path that reads the exercised contract's create argument. */
+export const CONTRACT_PREFIX = '@.contract.'
+
 export type Step = { kind: 'name'; name: string } | { kind: 'key'; key: string }
 
 export class PathError extends Error {
@@ -63,7 +66,7 @@ export interface Resolved {
     /**
      * Set when a record has no field labelled as the path names. The ledger leaves trailing `None`
      * fields out of a record, and upgrades only append optional fields, so such a field is taken to
-     * be `None`. A mistyped path looks the same, so the caller shows that the value was inferred.
+     * be `None`. A mistyped path looks the same.
      */
     absentField?: string
 }

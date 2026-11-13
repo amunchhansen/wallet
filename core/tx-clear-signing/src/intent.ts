@@ -1,8 +1,6 @@
 // Copyright (c) 2025-2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-export const CONTRACT_PREFIX = '@.contract.'
-
 export type IntentSegment =
     | { kind: 'text'; text: string }
     | { kind: 'placeholder'; path: string }

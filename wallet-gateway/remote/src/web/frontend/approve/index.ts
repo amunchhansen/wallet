@@ -19,9 +19,8 @@ import {
 import {
     clearSign,
     HashMismatchError,
-    type TransactionDescription,
+    type ClearSigningResult,
 } from '@canton-network/core-tx-clear-signing'
-import { selectDescriptors } from '@canton-network/core-wallet-services/clear-signing'
 import { activeDescriptors } from '../descriptors-store.js'
 import { createUserClient } from '../rpc-client'
 import { setLocationHref } from '../navigation.js'
@@ -55,7 +54,7 @@ export class ApproveUi extends BaseElement {
     @state() accessor hashMismatch = false
     @state() accessor tx = ''
     @state() accessor txParsed: ParsedTransactionInfo | null = null
-    @state() accessor clearSigning: TransactionDescription | null = null
+    @state() accessor clearSigning: ClearSigningResult | null = null
     @state() accessor clearSigningError: string | null = null
     @state() accessor previewNotice: string | null = null
     @state() accessor status = ''
@@ -380,30 +379,22 @@ export class ApproveUi extends BaseElement {
     }
 
     /**
-     * Describes `this.tx` when it hashes to `claimedHash`. `clearSign` checks the hash, and its
-     * returned hash is the one a later sign request sends.
+     * Describes `this.tx` when it hashes to `claimedHash`. Once `clearSign` has checked it, that hash
+     * is the one a later sign request sends.
      */
     private async describeTransaction(claimedHash: string) {
         this.parseTransaction()
-        const candidates = activeDescriptors().map((a) => a.descriptor)
-        // Selection throws before any hash check. The full list lets clearSign check the hash
-        // first. When the hash matches, a failed selection is what the page reports: passing the
-        // full list on would itself be rejected as too many descriptors.
-        let descriptors = candidates
-        let selectionError: unknown
+        const descriptors = activeDescriptors().map((a) => a.descriptor)
         try {
-            descriptors = selectDescriptors(this.tx, candidates)
-        } catch (error) {
-            selectionError = error
-        }
-        try {
-            const described = await clearSign(this.tx, descriptors, claimedHash)
-            if (selectionError) throw selectionError
-            this.clearSigning = described
+            this.clearSigning = await clearSign(
+                this.tx,
+                descriptors,
+                claimedHash
+            )
             this.clearSigningError = null
-            this.reviewedHash = described.hash
+            this.reviewedHash = claimedHash
             this.hashMismatch = false
-            this.txHash = described.hash
+            this.txHash = claimedHash
         } catch (error) {
             console.error('Error describing prepared transaction:', error)
             this.clearSigning = null
@@ -419,12 +410,11 @@ export class ApproveUi extends BaseElement {
             }
             // clearSign checks the hash before it describes, so the hash matched and approval
             // stays available. The detail view shows why the description failed.
-            const reported = selectionError ?? error
             this.reviewedHash = claimedHash
             this.hashMismatch = false
             this.txHash = claimedHash
             this.clearSigningError =
-                reported instanceof Error ? reported.message : String(reported)
+                error instanceof Error ? error.message : String(error)
         }
     }
 

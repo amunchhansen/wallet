@@ -17,9 +17,13 @@ export type EnumTables = Partial<Record<string, Record<string, string>>>
 const MICROS_PER_SECOND = 1_000_000n
 const MS_PER_DAY = 86_400_000
 
+/** How a field names its enum table: `$.metadata.enums.<name>`. */
+export const ENUM_REF_PREFIX = '$.metadata.enums.'
+
 /**
  * Formats a Daml value for display. Each formatter accepts only certain value kinds and fails on any
- * other; it never coerces.
+ * other; it never coerces. Text is shown as a JSON string literal, so a value read from the
+ * transaction cannot pass as the descriptor's wording.
  *
  * @throws FormatError on a kind the formatter does not accept, or an enum value missing from its table
  */
@@ -32,7 +36,7 @@ function formatUnsanitized(v: Value, field: Field, enums: EnumTables): string {
     const format = field.format ?? 'raw'
     switch (format) {
         case 'string':
-            if (sum.oneofKind === 'text') return sum.text
+            if (sum.oneofKind === 'text') return JSON.stringify(sum.text)
             break
         case 'number':
             if (sum.oneofKind === 'int64') return sum.int64
@@ -69,7 +73,7 @@ function formatUnsanitized(v: Value, field: Field, enums: EnumTables): string {
 
 function formatEnum(v: Value, field: Field, enums: EnumTables): string {
     const ref = field.params?.$ref ?? ''
-    const table = enums[ref.slice('$.metadata.enums.'.length)]
+    const table = enums[ref.slice(ENUM_REF_PREFIX.length)]
     if (!table) {
         throw new FormatError(`enum table '${ref}' does not exist`)
     }
@@ -82,7 +86,7 @@ function formatEnum(v: Value, field: Field, enums: EnumTables): string {
 }
 
 /** The table key of an enum, a bool, or a variant with no payload. */
-export function enumKey(v: Value): string {
+function enumKey(v: Value): string {
     const sum = v.sum
     switch (sum.oneofKind) {
         case 'enum':
@@ -160,7 +164,8 @@ function formatDuration(micros: bigint): string {
 
 function formatRaw(v: Value): string {
     const plain = toPlain(v)
-    return typeof plain === 'string' ? plain : JSON.stringify(plain)
+    const quoted = v.sum.oneofKind === 'text' || typeof plain !== 'string'
+    return quoted ? JSON.stringify(plain) : plain
 }
 
 type Plain = string | boolean | null | Plain[] | { [key: string]: Plain }

@@ -2,29 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from 'vitest'
-import {
-    clearSign,
-    type OperationDescription,
-} from '../../../tx-clear-signing/src/clear-sign.js'
+import { clearSign } from '../../../tx-clear-signing/src/clear-sign.js'
 import {
     hashEither,
     intentText,
+    shown,
 } from '../../../tx-clear-signing/src/__tests__/helpers.js'
 import { allocationV2Multileg } from '../../../tx-clear-signing/src/__tests__/fixtures/allocation-v2-multileg.js'
 import { builtinPingCreate } from '../../../tx-clear-signing/src/__tests__/fixtures/ping.js'
-import { selectDescriptors } from './select.js'
 import { shippedDescriptors } from './shipped.js'
 
-function field(op: OperationDescription | undefined, path: string) {
-    return op?.fields.find((f) => f.path === path)?.value
-}
-
+// The whole shipped set is passed: descriptors for templates the transaction does not use are ignored.
 async function described(tx: string) {
-    return clearSign(
-        tx,
-        selectDescriptors(tx, shippedDescriptors()),
-        await hashEither(tx)
-    )
+    return clearSign(tx, shippedDescriptors(), await hashEither(tx))
 }
 
 const pingPackageId =
@@ -62,7 +52,7 @@ describe('shippedDescriptors', () => {
             },
         })
         expect(intentText(op)).toContain('of 2 transfer legs')
-        const legs = field(op, 'allocation.transferLegSides')
+        const legs = shown(op?.fields.find((f) => f.label === 'Legs'))
         expect(legs).toEqual(expect.any(String))
         expect(JSON.parse(legs as string)).toMatchObject([
             {

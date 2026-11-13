@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { parseDescriptor } from './descriptor.js'
-import { described, intentText } from './__tests__/helpers.js'
+import { described, intentText, shown } from './__tests__/helpers.js'
 import { utilityTransferAccept } from './__tests__/fixtures/utility-transfer-accept.js'
 import transferOffer from './__tests__/schema-examples/utility-transfer-offer.json'
 
@@ -31,15 +31,15 @@ describe('TransferInstruction_Accept on a utility TransferOffer', () => {
             },
             status: 'described',
         })
-        expect(op?.fields.map((f) => [f.label, f.value])).toEqual([
+        expect(op?.fields.map((f) => [f.label, shown(f)])).toEqual([
             ['Amount', '0.0000000421'],
-            ['Instrument', 'Tebirkes'],
+            ['Instrument', '"Tebirkes"'],
             ['From', SENDER],
             ['To', RECEIVER],
             ['Transfer rule', TRANSFER_RULE],
         ])
         expect(intentText(op)).toBe(
-            `Accept 0.0000000421 Tebirkes from ${SENDER} to ${RECEIVER}, settled according to the transfer rule at ${TRANSFER_RULE}`
+            `Accept 0.0000000421 "Tebirkes" from ${SENDER} to ${RECEIVER}, settled according to the transfer rule at ${TRANSFER_RULE}`
         )
     })
 })

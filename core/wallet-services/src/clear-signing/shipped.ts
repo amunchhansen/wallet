@@ -23,8 +23,8 @@ const shipped: readonly Descriptor[] = Object.freeze([
 ])
 
 /**
- * The descriptors bundled with the wallet gateways. A caller merges uploads over this set, selects
- * the ones a transaction uses, and passes that list to `clearSign`.
+ * The descriptors bundled with the wallet gateways. A caller merges uploads over this set and passes
+ * the result to `clearSign`.
  */
 export function shippedDescriptors(): readonly Descriptor[] {
     return shipped

@@ -34,7 +34,7 @@ export function templateKeyOf(json: unknown): string {
 
 /**
  * The shipped descriptors, each replaced by an upload for the same template, followed by the other
- * uploads. At most one per template, which is what `clearSign` requires.
+ * uploads. At most one per template: `clearSign` reports a template with two as invalid.
  */
 export function mergeDescriptors(
     shipped: readonly Descriptor[],

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { z } from 'zod'
-import { UNSAFE_CLASS } from './format.js'
+import { ENUM_REF_PREFIX, UNSAFE_CLASS } from './format.js'
 import { parseIntent } from './intent.js'
 
 // The patterns are those of canton-clear-signing-v1.schema.json. The conformance test runs the
@@ -165,8 +165,8 @@ export class DescriptorError extends Error {
  * same operation, every enum reference names a table, and no two exercise entries name the same
  * choice and interface.
  *
- * `clearSign` calls this. A descriptor that fails and still names a root template is reported on
- * that root, and the other roots are still described.
+ * A descriptor that fails and still names a root template leaves that root `invalid`; the other
+ * roots are still described.
  *
  * @throws DescriptorError listing every problem found
  */
@@ -256,7 +256,7 @@ function fieldProblems(
             )
         }
         seen.add(f.path)
-        const enumName = f.params?.$ref.slice('$.metadata.enums.'.length)
+        const enumName = f.params?.$ref.slice(ENUM_REF_PREFIX.length)
         if (enumName !== undefined && !d.metadata.enums?.[enumName]) {
             problems.push(
                 `${where}: field '${f.path}' references missing enum '${f.params?.$ref}'`

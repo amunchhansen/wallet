@@ -9,6 +9,5 @@ Services needed to implement a wallet. Both wallet gateways use this package: th
 - `shippedDescriptors` is the initial set bundled with the gateways: the builtin Canton ping and bong templates, and `Splice.ExternalPartyAmuletRules`.
 - `templateKeyOf` reads `context.template` (`packageId`, `moduleName`, `entityName`) so an upload can be stored and can replace another descriptor for that template. It does not validate the rest.
 - `mergeDescriptors` lays uploaded descriptors over the shipped set. An upload for the same template replaces the shipped one.
-- `selectDescriptors` returns the candidates bound to the transaction's create and exercise roots, one per template, in root order.
 
-`clearSign` in `@canton-network/core-tx-clear-signing` takes that selected list. It checks the hash, rejects a descriptor the transaction does not use, and describes each root.
+`clearSign` in `@canton-network/core-tx-clear-signing` takes the merged list. It checks the hash, binds each root to the descriptor for its template, ignores the rest, and describes each root.

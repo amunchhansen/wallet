@@ -111,10 +111,15 @@ describe('formatValue', () => {
         )
     })
 
-    it('escapes control and bidirectional characters', () => {
+    it('quotes text, and escapes control and bidirectional characters', () => {
         expect(formatValue(text(`a\nb${RLO}c`), field('string'), {})).toBe(
-            'a\\u{000a}b\\u{202e}c'
+            '"a\\nb\\u{202e}c"'
         )
+    })
+
+    it('quotes text shown raw', () => {
+        expect(formatValue(text('a "b"'), field('raw'), {})).toBe('"a \\"b\\""')
+        expect(formatValue(int64('5'), field('raw'), {})).toBe('5')
     })
 
     it('shows a value without format as raw', () => {

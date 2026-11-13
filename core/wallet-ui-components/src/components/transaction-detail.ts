@@ -7,13 +7,7 @@ import './back-link.js'
 import './copy-button.js'
 import { BaseElement } from '../internal/base-element.js'
 import type { ParsedTransactionInfo } from '@canton-network/core-tx-visualizer'
-import type {
-    DescribedField,
-    IntentPart,
-    OperationDescription,
-    TemplateRef,
-    TransactionDescription,
-} from '@canton-network/core-tx-clear-signing'
+import type { ClearSigningResult } from '@canton-network/core-tx-clear-signing'
 import { chevronDownIcon } from '../icons/index.js'
 import {
     getActivityStatusBadgeClass,
@@ -22,6 +16,10 @@ import {
 } from '../internal/activity-utils.js'
 import { formatDateTime, formatUtcDateTime } from '../date-time.js'
 import { renderCopyableValue } from '../internal/activity-render.js'
+
+type OperationDescription = ClearSigningResult['operations'][number]
+type DescribedField = OperationDescription['fields'][number]
+type TemplateRef = NonNullable<OperationDescription['template']>
 
 const OPERATION_STATUS_LABELS: Record<
     Exclude<OperationDescription['status'], 'described'>,
@@ -78,7 +76,7 @@ class WgTransactionDetail extends BaseElement {
 
     /** The clear-signing description of the transaction's root operations, when available */
     @property({ type: Object })
-    accessor clearSigning: TransactionDescription | null = null
+    accessor clearSigning: ClearSigningResult | null = null
 
     /** Why the transaction could not be described at all, when it could not */
     @property() accessor clearSigningError: string | null = null
@@ -329,15 +327,6 @@ class WgTransactionDetail extends BaseElement {
                 word-break: break-word;
             }
 
-            .intent-value {
-                font-family: var(--bs-font-monospace);
-                font-weight: var(--wg-font-weight-normal);
-                padding: 0 var(--wg-space-1);
-                border-radius: var(--wg-radius-sm);
-                background: rgba(var(--wg-shade-rgb), 0.08);
-                white-space: pre-wrap;
-            }
-
             .operation-origin dd.identifier {
                 font-family: var(--bs-font-monospace);
             }
@@ -504,7 +493,7 @@ class WgTransactionDetail extends BaseElement {
                         >${OPERATION_KIND_LABELS[op.kind]}</span
                     >
                     <p class="intent mb-0">
-                        ${op.intent.map(renderIntentPart)}
+                        ${op.intent}
                         ${
                             op.status === 'described'
                                 ? nothing
@@ -698,22 +687,6 @@ function typeName({ moduleName, entityName }: TemplateRef): string {
 
 // What the transaction itself says it does (kind, choice, template), so an operation is identified
 // even when its descriptor words it vaguely or is missing. The descriptor's own claim is kept apart.
-// Values read from the transaction are set apart from the descriptor's wording, so a text value
-// cannot pass as part of the sentence. A string is quoted, so an empty string is "" and the spaces
-// around it do not collapse into each other.
-function renderIntentPart(part: IntentPart) {
-    return part.kind === 'text'
-        ? part.text
-        : html`<span class="intent-value" title=${part.path}
-              >${renderValue(part.value, part.format)}</span
-          >`
-}
-
-function renderValue(value: string, format?: DescribedField['format']) {
-    // An empty span does not separate the spaces on either side of it.
-    return format === 'string' || value === '' ? JSON.stringify(value) : value
-}
-
 function renderOperationOrigin(op: OperationDescription) {
     const { choiceId, descriptor, template } = op
     return html`<dl class="operation-origin">
@@ -772,28 +745,10 @@ function renderFields(fields: DescribedField[]): unknown {
 }
 
 function renderFieldValue(field: DescribedField) {
-    if (field.error !== undefined) {
+    if ('error' in field) {
         return html`<span class="text-danger"
             >Cannot display: ${field.error}</span
         >`
     }
-    if (field.value === undefined) {
-        return nothing
-    }
-    // The ledger leaves trailing None fields out of a record, so a missing field is shown as None.
-    // A mistyped descriptor path looks the same, so the user is told the value was inferred.
-    const shown = html`${renderValue(field.value, field.format)}${
-        field.enumKey !== undefined
-            ? html`<span class="small text-body-secondary">
-                  (${field.enumKey})</span
-              >`
-            : nothing
-    }`
-    if (field.absent) {
-        return html`${shown}
-            <span class="small text-warning-emphasis"
-                >(not in the transaction)</span
-            >`
-    }
-    return shown
+    return field.value
 }

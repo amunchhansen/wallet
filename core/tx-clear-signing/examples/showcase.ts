@@ -29,8 +29,8 @@ export const intents = [
     'Create a governance lock of 10000.0000000000 for alice::1220preview',
     'Featured app right for provider::1220preview',
     'Record activity of provider::1220preview for 2 beneficiaries',
-    'Record a balance update in group flatmates of alice::1220preview',
-    'Request a vote by alice::1220preview: Raise maxTextLength',
+    'Record a balance update in group "flatmates" of alice::1220preview',
+    'Request a vote by alice::1220preview: "Raise maxTextLength"',
 ] as const
 
 const descriptors = [
@@ -46,13 +46,13 @@ export function describeShowcase() {
 
 async function run(): Promise<void> {
     const result = await describeShowcase()
-    const wording = result.operations.map((op) => op.interpolatedIntent)
+    const wording = result.operations.map((op) => op.intent)
     const actual = wording.join('\n')
     const expected = intents.join('\n')
     if (actual !== expected) {
         throw new Error(`wording changed:\n${actual}`)
     }
-    console.log(result.operations[0])
+    console.log(actual)
 }
 
 const entry = process.argv[1]

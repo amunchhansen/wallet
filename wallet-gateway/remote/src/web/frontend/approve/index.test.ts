@@ -17,8 +17,9 @@ import {
 } from '../__tests__/test-helpers.js'
 import { pingCreate, pingCreateHash } from '../__tests__/ping-transaction.js'
 
-// A fetch root decodes and hashes. clearSign rejects it, because a root has to be a create or an
-// exercise. An empty prepared transaction cannot be hashed, which would also disable approval.
+// A fetch root decodes and hashes. clearSign reports it as undescribable, because only a create or
+// an exercise root is described. An empty prepared transaction cannot be hashed, which would also
+// disable approval.
 const fetchRoot =
     'CtsDCgMyLjESATAa0AMKATDCPskDEsYDCgMyLjESQjAwODM2ZmE0NzAxNmQ4OWJmZWRlNjM5NzlhZDA0OTJkZWI3OGQ5Yzc4MDYzNWNiNDhlMTdhYWE5YjRlNGE2OTczOBoiY2FudG9uLWJ1aWx0aW4tYWRtaW4td29ya2Zsb3ctcGluZyJeCkBkZTJjYzJmOTBlYjUyMzQxNGZmNTRlODk5OTUxZGFkZDg3ODlhNGMwN2UwZjcxZjZkNmM5ZWFmNTdkNDEyYTU0EhRDYW50b24uSW50ZXJuYWwuUGluZxoEUGluZypRdjEtMDEtYWxpY2U6OjEyMjBlZTI2MjQxOTA4MzRkZGRmMjhmMTk0Njg1YWNlZThmMDBjYmRlOWVlMGQyMTFkYWUyNzdmNGQ3OTk4ODRmMjg5MlF2MS0wMS1hbGljZTo6MTIyMGVlMjYyNDE5MDgzNGRkZGYyOGYxOTQ2ODVhY2VlOGYwMGNiZGU5ZWUwZDIxMWRhZTI3N2Y0ZDc5OTg4NGYyODk6UXYxLTAxLWFsaWNlOjoxMjIwZWUyNjI0MTkwODM0ZGRkZjI4ZjE5NDY4NWFjZWU4ZjAwY2JkZTllZTBkMjExZGFlMjc3ZjRkNzk5ODg0ZjI4ORL/ARJ5ClF2MS0wMS1hbGljZTo6MTIyMGVlMjYyNDE5MDgzNGRkZGYyOGYxOTQ2ODVhY2VlOGYwMGNiZGU5ZWUwZDIxMWRhZTI3N2Y0ZDc5OTg4NGYyODkSJDUxMjFkMTIwLTNjNTMtNDEwMy04NmFhLTdhM2VhNjZlYzQ2NRpTZ2xvYmFsLWRvbWFpbjo6MTIyMGI5NTM5MWNkMDNlMTE4NzFkNTRlOTBjMjAyNTc1ZDI5ZTc2YzI2NWRkMzg4YjhhZmIwNWFhZDU0ZDY3MGRmYzYqJDhiOTBhNDQ4LTFmZmEtNDA0OS04NTNlLWY4YjRmZTg1M2RjMjCwqJjB5v+UAw=='
 const fetchRootHash = 'E5qahj0hgHMh/gvQzwrmZpXv4BmXbewRLujEFbabegM='
@@ -264,10 +265,9 @@ describe('UserUiApprove', () => {
             )
 
             expect(el.clearSigning?.complete).toBe(true)
-            expect(el.clearSigning?.operations[0]?.intent[0]).toEqual({
-                kind: 'text',
-                text: 'Ping ',
-            })
+            expect(el.clearSigning?.operations[0]?.intent).toMatch(
+                /^Ping "[^"]+" from /
+            )
             expect(el.clearSigning?.operations[0]).toMatchObject({
                 kind: 'create',
                 template: {
@@ -297,7 +297,7 @@ describe('UserUiApprove', () => {
             ).toHaveProperty('disabled', false)
         })
 
-        it('marks an empty value, so it does not vanish from the intent', async () => {
+        it('shows the intent and fields as clearSign words them', async () => {
             mockApproveState(
                 makeTransaction({ preparedTransaction: pingCreate })
             )
@@ -320,38 +320,17 @@ describe('UserUiApprove', () => {
                 complete: true,
                 operations: [
                     {
-                        nodeId: '0',
                         kind: 'create',
                         template,
                         status: 'described',
-                        interpolatedIntent: 'Memo  was set',
-                        intent: [
-                            { kind: 'text', text: 'Memo ' },
-                            {
-                                kind: 'value',
-                                path: 'memo',
-                                value: '',
-                                format: 'string',
-                            },
-                            { kind: 'text', text: ' was set' },
-                        ],
-                        fields: [
-                            {
-                                label: 'Memo',
-                                path: 'memo',
-                                value: '',
-                                format: 'string',
-                            },
-                        ],
+                        intent: 'Memo "" was set',
+                        fields: [{ label: 'Memo', value: '""' }],
                     },
                 ],
             }
             await detail.updateComplete
 
             const root = detail.shadowRoot
-            expect(
-                root?.querySelector('.intent .intent-value')?.textContent
-            ).toBe('""')
             expect(root?.querySelector('.intent')?.textContent).toContain(
                 'Memo "" was set'
             )

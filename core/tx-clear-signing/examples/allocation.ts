@@ -21,7 +21,7 @@ export const preparedTransactionHash =
     'Ajytt4Ri6HMIauOQ5IuvaWR65kOPPxN2GrCfrnXPmVE='
 
 export const intent =
-    'Allocate funds at DSO::1220d8a721d292c5bd3bbfe1653ab6eeba8d8cfc88e322bc52c2702194bd2347a813 for settlement capture-multileg-1788338015304997000 of 2 transfer legs, authorized by bd::1220fd4f42cf33a603bd45714c9b0181eb661b4570d22df79a352080aa7d121cdee7. Committed: cannot be withdrawn before the settlement deadline'
+    'Allocate funds at DSO::1220d8a721d292c5bd3bbfe1653ab6eeba8d8cfc88e322bc52c2702194bd2347a813 for settlement "capture-multileg-1788338015304997000" of 2 transfer legs, authorized by bd::1220fd4f42cf33a603bd45714c9b0181eb661b4570d22df79a352080aa7d121cdee7. Committed: cannot be withdrawn before the settlement deadline'
 
 export function describeAllocation() {
     return clearSign(
@@ -33,7 +33,7 @@ export function describeAllocation() {
 
 async function run(): Promise<void> {
     const result = await describeAllocation()
-    const wording = result.operations[0]?.interpolatedIntent
+    const wording = result.operations[0]?.intent
     if (wording !== intent) {
         throw new Error(`wording changed: ${wording}`)
     }

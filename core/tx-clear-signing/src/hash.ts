@@ -9,24 +9,20 @@ import { toBase64 } from './bytes.js'
 const SCHEMES = [HashingSchemeVersion.V3, HashingSchemeVersion.V2] as const
 
 /**
- * The hash of `preparedTransaction`, computed from the bytes themselves. `claimedHash` only selects
- * the hashing scheme. Returns undefined when no scheme reproduces it: the bytes are then not the
- * transaction that hash belongs to.
- *
- * `clearSign` is the only caller. It throws `HashMismatchError` when this returns undefined. Unknown
- * protobuf fields are refused. A transaction that cannot be hashed throws.
+ * Whether `preparedTransaction` hashes to `expectedHash`. The hash is computed from the bytes, under
+ * each supported scheme; `expectedHash` only selects the scheme. A transaction that cannot be hashed
+ * throws.
  */
-export async function hashForReview(
+export async function hashesTo(
     preparedTransaction: string,
-    claimedHash: string
-): Promise<string | undefined> {
-    for (const hashingScheme of SCHEMES) {
+    expectedHash: string
+): Promise<boolean> {
+    for (const scheme of SCHEMES) {
         const digest = await computePreparedTransactionHash(
             preparedTransaction,
-            hashingScheme
+            scheme
         )
-        const hash = toBase64(digest)
-        if (hash === claimedHash) return hash
+        if (toBase64(digest) === expectedHash) return true
     }
-    return undefined
+    return false
 }

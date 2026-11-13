@@ -2,22 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 export {
-    ExtraDescriptorsError,
-    HashMismatchError,
     clearSign,
+    HashMismatchError,
     type ClearSigningResult,
-    type ExtraDescriptor,
-    type TransactionDescription,
-    type DescribedField,
-    type DescriptorInfo,
-    type IntentPart,
-    type OperationDescription,
 } from './clear-sign.js'
-export {
-    type Descriptor,
-    type Field,
-    type Format,
-    type Exercise,
-    type Operation,
-} from './descriptor.js'
-export { type TemplateRef } from './roots.js'
+export type { Descriptor } from './descriptor.js'

@@ -50,8 +50,8 @@ export function removeDescriptor(descriptor: Descriptor): void {
 
 /**
  * The descriptors the approve page describes transactions with: the built-in ones, each replaced by an
- * upload for the same template, followed by the other uploads. At most one per template, as
- * `clearSign` requires.
+ * upload for the same template, followed by the other uploads. At most one per template, so an
+ * upload never makes a shipped template invalid in `clearSign`.
  */
 export function activeDescriptors(): ActiveDescriptor[] {
     return mergeDescriptors(shippedDescriptors(), uploadedDescriptors())

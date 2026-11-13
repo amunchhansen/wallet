@@ -3,7 +3,7 @@
 
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import type { ParsedTransactionInfo } from '@canton-network/core-tx-visualizer'
-import type { TransactionDescription } from '@canton-network/core-tx-clear-signing'
+import type { ClearSigningResult } from '@canton-network/core-tx-clear-signing'
 import {
     findAllByShadowRole,
     findAllByShadowText,
@@ -343,11 +343,10 @@ const factoryTemplate = {
     entityName: 'ExternalPartyAmuletRules',
 }
 
-const clearSigning: TransactionDescription = {
+const clearSigning: ClearSigningResult = {
     complete: false,
     operations: [
         {
-            nodeId: '0',
             kind: 'create',
             template: pingTemplate,
             descriptor: {
@@ -356,47 +355,29 @@ const clearSigning: TransactionDescription = {
                 version: '1.0.0',
             },
             status: 'described',
-            interpolatedIntent: 'Ping ping-1 from alice::1220aa to bob::1220bb',
-            intent: [
-                { kind: 'text', text: 'Ping ' },
-                { kind: 'value', path: 'id', value: 'ping-1' },
-                { kind: 'text', text: ' from ' },
-                { kind: 'value', path: 'initiator', value: 'alice::1220aa' },
-                { kind: 'text', text: ' to ' },
-                { kind: 'value', path: 'responder', value: 'bob::1220bb' },
-            ],
+            intent: 'Ping "ping-1" from alice::1220aa to bob::1220bb',
             fields: [
-                { label: 'Ping ID', path: 'id', value: 'ping-1' },
+                { label: 'Ping ID', value: '"ping-1"' },
                 {
                     label: 'Executors',
-                    path: 'executors',
                     value: '["alice::1220aa","bob::1220bb"]',
                 },
-                { label: 'Deadline', path: 'deadline', value: 'None' },
+                { label: 'Deadline', value: 'None' },
                 {
                     label: 'Amount',
-                    path: 'amount',
                     error: "format 'number' does not accept text",
                 },
             ],
         },
         {
-            nodeId: '1',
             kind: 'exercise',
             template: pingTemplate,
             choiceId: 'Archive',
             status: 'undescribed',
-            interpolatedIntent: 'Exercise Archive on Canton.Internal.Ping:Ping',
-            intent: [
-                {
-                    kind: 'text',
-                    text: 'Exercise Archive on Canton.Internal.Ping:Ping',
-                },
-            ],
+            intent: 'Exercise Archive on Canton.Internal.Ping:Ping',
             fields: [],
         },
         {
-            nodeId: '2',
             kind: 'exercise',
             template: factoryTemplate,
             choiceId: 'AllocationFactory_Allocate',
@@ -412,8 +393,7 @@ const clearSigning: TransactionDescription = {
                 version: '1.0.0',
             },
             status: 'described',
-            interpolatedIntent: 'Allocate funds for a settlement',
-            intent: [{ kind: 'text', text: 'Allocate funds for a settlement' }],
+            intent: 'Allocate funds for a settlement',
             fields: [],
         },
     ],
@@ -422,12 +402,11 @@ const clearSigning: TransactionDescription = {
 export const ClearSigned: Story = {
     args: { clearSigning },
     play: async ({ canvasElement }) => {
-        // Values in the intent are rendered apart from the wording, and again as the field
-        await expect(
-            await findAllByShadowText(canvasElement, 'ping-1')
-        ).toHaveLength(2)
         for (const text of [
             'What you are signing',
+            // Text values read from the transaction are quoted, in the intent and in the field
+            'Ping "ping-1" from alice::1220aa to bob::1220bb',
+            '"ping-1"',
             '["alice::1220aa","bob::1220bb"]',
             'None',
             "Cannot display: format 'number' does not accept text",

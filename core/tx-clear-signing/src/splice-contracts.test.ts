@@ -11,11 +11,7 @@ import { HashingSchemeVersion } from '@canton-network/core-ledger-proto'
 import { computePreparedTransactionHash } from '@canton-network/core-tx-hashing'
 import { toBase64 } from './bytes.js'
 import type { OperationDescription } from './clear-sign.js'
-import {
-    described,
-    descriptorsForRoots,
-    intentText,
-} from './__tests__/helpers.js'
+import { described, intentText, shown } from './__tests__/helpers.js'
 import {
     ALICE,
     BOB,
@@ -45,22 +41,17 @@ const describeCaptured = (id: string) =>
     describeOne(captured(id).preparedTransaction)
 
 function describedSplice(preparedTransaction: string) {
-    return described(
-        preparedTransaction,
-        descriptorsForRoots(preparedTransaction, spliceDescriptors)
-    )
+    return described(preparedTransaction, spliceDescriptors)
 }
 
-type Field = OperationDescription['fields'][number]
-
-/** Each field as label → value, `None (absent)` or `error: …`. */
+/** Each field as label → value or `error: …`. */
 function fields(op: OperationDescription): Record<string, string> {
-    return Object.fromEntries(op.fields.map((f) => [f.label, show(f)]))
-}
-
-function show(f: Field): string {
-    if (f.absent) return `${f.value} (absent)`
-    return f.value ?? `error: ${f.error}`
+    return Object.fromEntries(
+        op.fields.map((f) => [
+            f.label,
+            'value' in f ? f.value : `error: ${shown(f)}`,
+        ])
+    )
 }
 
 describe('captured fixtures', () => {
@@ -104,7 +95,7 @@ describe('governance locks', () => {
             Funding: expect.stringMatching(/^003dc46d/),
             Expires: '2026-11-16T16:29:58Z',
             // A trailing None field is not in the prepared transaction; its None case is marked as inferred
-            'First proposal': 'None (absent)',
+            'First proposal': 'None',
         })
         expect(JSON.parse(fields(op)['Lock type']!)).toEqual({
             GLS_VestingLock: {
@@ -192,7 +183,7 @@ describe('governance locks', () => {
 describe('governance lock requests through the transfer factory', () => {
     const METADATA = 'Metadata, which the receiver may act on'
     const request = (amount: string) =>
-        `Request a transfer of ${amount} Amulet from ${ALICE} to ${LOCK_MANAGER}. What the receiver does with it depends on the transfer's metadata`
+        `Request a transfer of ${amount} "Amulet" from ${ALICE} to ${LOCK_MANAGER}. What the receiver does with it depends on the transfer's metadata`
 
     it('words an unlock request as a requested transfer, with the request in the metadata', async () => {
         const op = await describeOne(simulated['epar-transfer-v1-unlock']())
@@ -205,7 +196,7 @@ describe('governance lock requests through the transfer factory', () => {
         expect(intentText(op)).toBe(request('1.0000000000'))
         expect(fields(op)).toEqual({
             'Requested amount': '1.0000000000',
-            Instrument: 'Amulet',
+            Instrument: '"Amulet"',
             From: ALICE,
             To: LOCK_MANAGER,
             [METADATA]: JSON.stringify({ [REASON_KEY]: UNLOCK_MEMO }),
@@ -260,7 +251,7 @@ describe('V1 and V2 AllocationFactory_Allocate each have their own entry', () =>
             'Splice.Api.Token.AllocationInstructionV1'
         )
         expect(intentText(op)).toBe(
-            `Allocate 75.0000000000 Amulet from ${ALICE} to ${BOB} for settlement trade-7, executed by ${PROVIDER}`
+            `Allocate 75.0000000000 "Amulet" from ${ALICE} to ${BOB} for settlement "trade-7", executed by ${PROVIDER}`
         )
         expect((await describedSplice(tx)).complete).toBe(true)
     })
@@ -271,11 +262,11 @@ describe('DSO governance', () => {
         const op = await describeCaptured('dso-request-vote-set-config')
         expect(op.status).toBe('described')
         expect(intentText(op)).toBe(
-            `Request a vote by ${ALICE}: Raise maxTextLength`
+            `Request a vote by ${ALICE}: "Raise maxTextLength"`
         )
         expect(fields(op)).toMatchObject({
             'Voting period': '3d',
-            'Effective at': 'None (absent)',
+            'Effective at': 'None',
         })
         const action = JSON.parse(fields(op)['Votes on']!)
         const setConfig = action.ARC_DsoRules.dsoAction.SRARC_SetConfig
@@ -291,7 +282,7 @@ describe('DSO governance', () => {
         const op = await describeCaptured('dso-request-vote-amulet-schedule')
         expect(op.status).toBe('described')
         expect(intentText(op)).toBe(
-            `Request a vote by ${ALICE}: New traffic price`
+            `Request a vote by ${ALICE}: "New traffic price"`
         )
         expect(fields(op)['Voting period']).toBe('None')
         const action = JSON.parse(fields(op)['Votes on']!)
@@ -323,13 +314,13 @@ describe('DSO governance', () => {
         const op = await describeCaptured('dso-set-synchronizer-node-config')
         expect(op.status).toBe('described')
         expect(fields(op)).toMatchObject({
-            'Sequencer URL': 'https://sequencer.example.com',
+            'Sequencer URL': '"https://sequencer.example.com"',
             'Sequencer migration': '3',
-            'Legacy sequencer URL': 'https://legacy-sequencer.example.com',
+            'Legacy sequencer URL': '"https://legacy-sequencer.example.com"',
             'Legacy sequencer migration': '2',
-            'Sequencer identity available after': 'None (absent)',
-            'Mediator ID': 'MED::current',
-            'Public URL': 'https://scan.example.com',
+            'Sequencer identity available after': 'None',
+            'Mediator ID': '"MED::current"',
+            'Public URL': '"https://scan.example.com"',
             'Governance keys': '1',
             'Physical synchronizers':
                 '[["1",{"sequencer":{"url":"https://psid-1.example.com"}}]]',
@@ -338,21 +329,23 @@ describe('DSO governance', () => {
 
     it('shows a GenMap keyed by text only as a whole', async () => {
         const op = await describeCaptured('vote-request-create')
-        expect(intentText(op)).toMatch(/^Vote by sv-1, open until /)
+        expect(intentText(op)).toMatch(/^Vote by "sv-1", open until /)
         const action = JSON.parse(fields(op)['Votes on']!)
         expect(
             action.ARC_DsoRules.dsoAction.SRARC_SetConfig.newConfig
                 .maxTextLength
         ).toBe('2048')
         expect(fields(op).Votes).toMatch(/^\[\["sv-1",\{"sv":/)
-        expect(fields(op).Tracking).toBe('None (absent)')
+        expect(fields(op).Tracking).toBe('None')
     })
 })
 
 describe('wallet and apps', () => {
     it('reads amount.amount and an enum unit', async () => {
         const op = await describeCaptured('transfer-offer-create')
-        expect(intentText(op)).toBe(`Offer 12.5000000000 USD to ${BOB}: Lunch`)
+        expect(intentText(op)).toBe(
+            `Offer 12.5000000000 USD to ${BOB}: "Lunch"`
+        )
     })
 
     it('words a choice without arguments from the contract alone', async () => {
@@ -373,11 +366,7 @@ describe('wallet and apps', () => {
             'Activity weight': '2.5000000000',
             'Number of operational parties': '1',
         })
-        expect(op.fields.find((f) => f.label === 'Kind')).toMatchObject({
-            value: 'Asset mover',
-            enumKey: 'FAK_AssetMoving',
-            format: 'enum',
-        })
+        expect(fields(op).Kind).toBe('Asset mover')
     })
 
     it('words V1 and V2 activity markers the same; weight is V2 only', async () => {
@@ -393,9 +382,9 @@ describe('wallet and apps', () => {
     it('indexes a TextMap of records with a quoted key', async () => {
         const op = await describeCaptured('otc-trade-proposal-create')
         expect(intentText(op)).toBe(
-            `Trade 100.0000000000 Amulet from ${ALICE} to ${BOB}, one of 2 legs`
+            `Trade 100.0000000000 "Amulet" from ${ALICE} to ${BOB}, one of 2 legs`
         )
-        expect(fields(op)['Leg 0 note']).toBe('csalice pays')
+        expect(fields(op)['Leg 0 note']).toBe('"csalice pays"')
     })
 
     it('counts the legs of the contract an accept acts on', async () => {
@@ -411,12 +400,12 @@ describe('wallet and apps', () => {
         )
         const netting = await describeCaptured('balance-update-create-netting')
         expect(intentText(transfer)).toBe(
-            `Record a balance update in group flatmates of ${ALICE}`
+            `Record a balance update in group "flatmates" of ${ALICE}`
         )
         expect(intentText(netting)).toBe(
-            `Record a balance update in group flatmates of ${ALICE}`
+            `Record a balance update in group "flatmates" of ${ALICE}`
         )
-        expect(fields(transfer).Group).toBe('flatmates')
+        expect(fields(transfer).Group).toBe('"flatmates"')
         expect(JSON.parse(fields(transfer).Update!)).toMatchObject({
             Transfer: { sender: BOB, amount: '42.0000000000' },
         })
@@ -451,7 +440,7 @@ describe('wallet and apps', () => {
         const op = await describeOne(simulated['wallet-user-proxy-transfer']())
         expect(op.status).toBe('described')
         expect(intentText(op)).toBe(
-            `Transfer 30.0000000000 Amulet from ${ALICE} to ${BOB} via ${PROVIDER}`
+            `Transfer 30.0000000000 "Amulet" from ${ALICE} to ${BOB} via ${PROVIDER}`
         )
     })
 
@@ -461,7 +450,7 @@ describe('wallet and apps', () => {
             `Send 25.0000000000 Amulet from ${ALICE} to ${BOB}`
         )
         expect(fields(op)).toMatchObject({
-            Description: 'Rent',
+            Description: '"Rent"',
             Metadata: JSON.stringify({
                 values: { [REASON_KEY]: 'Rent for November' },
             }),
@@ -475,10 +464,10 @@ describe('wallet and apps', () => {
         expect(op.status).toBe('described')
         expect(fields(op)).toMatchObject({
             // The None case matches an Optional the ledger left out of the record
-            Description: 'None (absent)',
-            Metadata: 'None (absent)',
+            Description: 'None',
+            Metadata: 'None',
         })
-        // An absent field is not a failure: the transaction is still completely described
+        // A field the ledger left out is not a failure: the transaction is still completely described
         expect((await describedSplice(tx)).complete).toBe(true)
     })
 
